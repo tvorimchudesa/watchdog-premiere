@@ -1,0 +1,140 @@
+00:00:00 [Music]
+00:00:05 greetings fellow editors Watchtower an
+00:00:08 old and trusty companion of your kingdom
+00:00:10 is finally dismantled and rebuilt from
+00:00:13 the ground
+00:00:16 up files import performance is improved
+00:00:20 which is good news for big projects with
+00:00:22 a lot of assets you will see instant
+00:00:24 import with
+00:00:28 autosync and The increased speed during
+00:00:31 manual
+00:00:39 sync auto sync is more stable
+00:00:43 now when files are copied or downloaded
+00:00:47 Watchtower will wait for files to be
+00:00:49 written on a
+00:00:50 dis and only then will try to import
+00:00:55 them here are the changes in the main
+00:00:57 panel Watchtower gets a progress bar
+00:01:00 making it easy to tell if it is doing
+00:01:02 something or not the auto sync setting
+00:01:05 is now a button on the main panel a
+00:01:08 little ey that you can toggle on and off
+00:01:11 at any moment settings are accessible
+00:01:14 through a rightclick menu to add watch
+00:01:17 folders just drag and drop folders from
+00:01:19 a file manager onto the Watch Tower
+00:01:21 panel the folders panel will open
+00:01:25 allowing you to adjust settings for the
+00:01:27 folders you've just added this p pannel
+00:01:30 also supports drag and drop so you can
+00:01:32 add even more folders here let's have a
+00:01:35 look at the folder settings state will
+00:01:38 show you whether the folder is online
+00:01:40 offline or it is a new folder that
+00:01:43 you've just
+00:01:44 added offline means that the folder path
+00:01:47 could not be found to fix it just click
+00:01:50 on the path and find the missing
+00:01:54 folder you can also do this to change
+00:01:57 the path of an existing watch folder
+00:02:00 next we have four
+00:02:02 checkboxes sub determines if sub folders
+00:02:05 should be imported or
+00:02:07 ignored ra is relative path makes the
+00:02:11 folder path relative to the project
+00:02:13 location this way you can move a whole
+00:02:16 folder structure with a project to a
+00:02:18 different location such as another drive
+00:02:21 and the watch folder connection will
+00:02:22 still be
+00:02:23 maintained this is especially useful for
+00:02:26 project templates seq image sequence
+00:02:29 import if you have image sequences
+00:02:32 inside that folder it will be imported
+00:02:34 as such when you add folders that
+00:02:37 already have image sequences inside
+00:02:39 Watchtower will detect them and enable
+00:02:41 that setting
+00:02:46 automatically FLT flatten folder this
+00:02:50 will import all files from subfolders
+00:02:53 into the top
+00:02:54 folder this could be useful for image
+00:02:57 sequences that are placed each in its
+00:02:59 own folder here I enable sequence and
+00:03:02 flatten checkboxes and all sequences in
+00:03:05 subfolders will go into the main
+00:03:14 folder this is also useful for camera
+00:03:16 cards that have a very complex folder
+00:03:19 structure and like before Watchtower
+00:03:22 will automatically detect camera cards
+00:03:25 enable the flatten setting for them and
+00:03:28 import span media from L without
+00:03:31 duplicates here I add red P2 Panasonic
+00:03:35 and AR
+00:03:37 cameras and everything is imported
+00:03:51 correctly you can find the currently
+00:03:54 supported camera folder structures in
+00:03:56 the
+00:03:57 manuscript if you forget what they three
+00:04:00 letters mean just hover your mouse over
+00:04:02 them to get a tool
+00:04:06 tip label is a new feature that assigns
+00:04:09 a selected label to all media imported
+00:04:12 in a watch folder for example you want
+00:04:14 to label your sound effects or other
+00:04:17 Clips with specific label therefore it
+00:04:20 is easy to distinguish them on a
+00:04:23 timeline so roses are red and violets
+00:04:27 are blue Watchtower Imports clips and
+00:04:30 labels them
+00:04:31 too now a timeline can be beautifully
+00:04:35 organized sometimes you already have
+00:04:37 bins with Assets in your project and you
+00:04:40 want to convert them to watch folders it
+00:04:43 is now very easy to link existing bins
+00:04:47 select and drag them onto the Watchtower
+00:04:49 panel you will see a link icon and when
+00:04:52 you drop them the folder panel will
+00:04:55 appear and here's a trick if you have at
+00:04:58 least one file
+00:05:00 inside that bin Watchtower will
+00:05:02 automatically use its parent folder path
+00:05:05 if you don't like it click on the path
+00:05:08 and change it onward to the settings
+00:05:11 settings allow you to decide which file
+00:05:13 extensions to
+00:05:16 import and which folder names should be
+00:05:18 ignored folder names also support
+00:05:21 regular Expressions which gives even
+00:05:24 more control over the folder name filter
+00:05:26 to learn more read the manuscript if the
+00:05:29 show import options is enabled import
+00:05:32 options for Photoshop illustrator and
+00:05:35 similar files will be shown to you
+00:05:37 during Import in After Effects you can
+00:05:40 decide how to import Photoshop
+00:05:42 Illustrator files with the import s
+00:05:45 setting add import date is a new feature
+00:05:48 for Premier Pro only it will add import
+00:05:51 date metadata to your project to see it
+00:05:55 go to the metadata display search for
+00:05:57 import date and enable it
+00:06:09 now every file imported by Watchtower
+00:06:12 will get an import date and time this
+00:06:15 metadata is written in a format that
+00:06:18 allows you to sort this column making it
+00:06:21 easy to keep track of the order in which
+00:06:24 files were added to a project now that
+00:06:27 the addition of the import date will
+00:06:30 increase the import time of a file this
+00:06:33 is not noticeable for a few files but if
+00:06:36 it is thousands of them you will need to
+00:06:39 wait this is where the progress bar will
+00:06:41 be useful before I say that is all thank
+00:06:44 you please note that Watchtower 1.5 will
+00:06:48 not support watch folders created by
+00:06:51 previous version of Watchtower you will
+00:06:53 need to relink them or add them again to
+00:06:55 your current projects that is all thank
+00:06:58 you
