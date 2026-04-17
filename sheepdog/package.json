@@ -1,0 +1,13 @@
+{
+  "name": "sheepdog",
+  "version": "1.0.0",
+  "description": "Auto-sync CEP extension for Adobe Premiere Pro",
+  "main": "js/app.js",
+  "scripts": {
+    "install-ext": "node scripts/install-ext.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0"
+  },
+  "license": "MIT"
+}

@@ -1,4 +1,4 @@
-// Watchdog — Architecture & Roadmap document for Figma Scripter
+// SheepDog — Architecture & Roadmap document for Figma Scripter
 // Run in Figma via Scripter plugin
 
 async function main() {
@@ -55,7 +55,6 @@ async function main() {
     f.layoutMode = "VERTICAL";
     f.layoutSizingHorizontal = "FIXED";
     f.layoutSizingVertical = "HUG";
-    f.layoutAlign = "STRETCH";
     return f;
   }
 
@@ -66,7 +65,6 @@ async function main() {
     f.layoutMode = "HORIZONTAL";
     f.layoutSizingHorizontal = "FIXED";
     f.layoutSizingVertical = "HUG";
-    f.layoutAlign = "STRETCH";
     return f;
   }
 
@@ -88,7 +86,7 @@ async function main() {
     t.fills = [{ type: "SOLID", color }];
     t.textAutoResize = "WIDTH_AND_HEIGHT";
     if (lh) t.lineHeight = { value: lh, unit: "PIXELS" };
-    if (ls !== undefined) t.letterSpacing = { value: ls, unit: "PIXELS" };
+    if (ls != null) t.letterSpacing = { value: ls, unit: "PIXELS" };
     return t;
   }
 
@@ -111,18 +109,15 @@ async function main() {
     f.counterAxisAlignItems = "CENTER";
     setFill(f, color, 0.15);
     f.cornerRadius = 20;
-    f.appendChild(txt(label, F.s, 11, color, null, null));
+    f.appendChild(txt(label, F.s, 11, color));
     return f;
   }
 
   function divider(w, color, opacity) {
-    const line = figma.createFrame();
-    line.resize(w, 1);
-    line.layoutAlign = "STRETCH";
-    line.layoutSizingHorizontal = "FILL";
-    line.layoutSizingVertical = "FIXED";
-    setFill(line, color, opacity || 0.15);
-    return line;
+    const r = figma.createRectangle();
+    r.resize(w, 1);
+    r.fills = [{ type: "SOLID", color: color, opacity: opacity || 0.15 }];
+    return r;
   }
 
   function makeCard(w, accent) {
@@ -131,7 +126,6 @@ async function main() {
     card.layoutMode = "VERTICAL";
     card.layoutSizingVertical = "HUG";
     card.layoutSizingHorizontal = "FIXED";
-    card.layoutAlign = "STRETCH";
     card.cornerRadius = CARD_R;
     card.clipsContent = true;
     setFill(card, C.cardBg);
@@ -148,7 +142,7 @@ async function main() {
 
   // Root frame
   const root = figma.createFrame();
-  root.name = "Watchdog — Architecture & Roadmap";
+  root.name = "SheepDog — Architecture & Roadmap";
   root.resize(W, 10);
   root.layoutMode = "VERTICAL";
   root.layoutSizingHorizontal = "FIXED";
@@ -163,8 +157,8 @@ async function main() {
   // ===== TITLE SECTION =====
   const titleSec = vSec(contentW);
   titleSec.itemSpacing = 8;
-  titleSec.appendChild(txt("WATCHDOG", F.b, 48, C.white, 56, 2));
-  titleSec.appendChild(txt("Premiere Pro CEP Extension — Architecture & Roadmap", F.r, 18, C.muted, 26, null));
+  titleSec.appendChild(txt("SHEEPDOG", F.b, 48, C.white, 56, 2));
+  titleSec.appendChild(txt("Premiere Pro CEP Extension — Architecture & Roadmap", F.r, 18, C.muted, 26));
   titleSec.appendChild(divider(contentW, C.white, 0.1));
   root.appendChild(titleSec);
 
@@ -175,7 +169,7 @@ async function main() {
   const archHeader = hHug();
   archHeader.itemSpacing = 12;
   archHeader.counterAxisAlignItems = "CENTER";
-  archHeader.appendChild(txt("Architecture", F.b, 28, C.white, 34, null));
+  archHeader.appendChild(txt("Architecture", F.b, 28, C.white, 34));
   archHeader.appendChild(pill("Apple Principles", C.purple));
   archSec.appendChild(archHeader);
 
@@ -230,7 +224,7 @@ async function main() {
     const hdr = hHug();
     hdr.itemSpacing = 12;
     hdr.counterAxisAlignItems = "CENTER";
-    hdr.appendChild(txt(layer.name, F.b, 20, layer.accent, null, null));
+    hdr.appendChild(txt(layer.name, F.b, 20, layer.accent));
     hdr.appendChild(pill(layer.tag, layer.accent));
     card.appendChild(hdr);
 
@@ -245,7 +239,6 @@ async function main() {
       if (i % 2 === 0) {
         row = hSec(gridW);
         row.itemSpacing = 16;
-        row.layoutSizingHorizontal = "FILL";
         card.appendChild(row);
       }
 
@@ -262,7 +255,7 @@ async function main() {
       modCard.itemSpacing = 6;
       modCard.name = mod.name;
 
-      modCard.appendChild(txt(mod.name, F.s, 14, C.white, null, null));
+      modCard.appendChild(txt(mod.name, F.s, 14, C.white));
       modCard.appendChild(txtW(mod.desc, F.r, 12, C.muted, colW - 28, 18));
       row.appendChild(modCard);
     }
@@ -275,7 +268,7 @@ async function main() {
   // ===== PRINCIPLES SECTION =====
   const princSec = vSec(contentW);
   princSec.itemSpacing = 16;
-  princSec.appendChild(txt("Apple Principles Applied", F.b, 28, C.white, 34, null));
+  princSec.appendChild(txt("Apple Principles Applied", F.b, 28, C.white, 34));
 
   const principles = [
     { name: "SRP", color: C.green, text: "Each module does ONE thing. Watcher watches. Importer imports. EventBus routes. No module has 'and' in its job description." },
@@ -285,18 +278,23 @@ async function main() {
     { name: "DRY", color: C.purple, text: "Shared Bridge module for all ExtendScript calls. Common event format across all modules. No premature abstractions." },
   ];
 
-  const princGrid = hSec(contentW);
-  princGrid.itemSpacing = 12;
-  princGrid.layoutWrap = "WRAP";
+  const princColW = Math.floor((contentW - 12 * 2) / 3);
 
-  for (const p of principles) {
-    const pCard = figma.createFrame();
-    pCard.resize(Math.floor((contentW - 24) / 3), 10);
-    pCard.layoutMode = "VERTICAL";
-    pCard.layoutSizingVertical = "HUG";
-    pCard.layoutSizingHorizontal = "FIXED";
-    pCard.cornerRadius = 12;
+  // Row 1: first 3 principles
+  const princRow1 = hSec(contentW);
+  princRow1.itemSpacing = 12;
+  princRow1.counterAxisAlignItems = "MIN";
+
+  // Row 2: last 2 principles
+  const princRow2 = hSec(contentW);
+  princRow2.itemSpacing = 12;
+  princRow2.counterAxisAlignItems = "MIN";
+
+  for (let i = 0; i < principles.length; i++) {
+    const p = principles[i];
+    const pCard = vSec(princColW);
     setFill(pCard, C.cardBg);
+    pCard.cornerRadius = 12;
     pCard.strokes = [{ type: "SOLID", color: p.color, opacity: 0.2 }];
     pCard.strokeWeight = 1;
     pCard.paddingTop = 16; pCard.paddingBottom = 16;
@@ -309,50 +307,54 @@ async function main() {
     pHdr.counterAxisAlignItems = "CENTER";
     pHdr.appendChild(pill(p.name, p.color));
     pCard.appendChild(pHdr);
-    pCard.appendChild(txtW(p.text, F.r, 12, C.muted, Math.floor((contentW - 24) / 3) - 32, 18));
-    princGrid.appendChild(pCard);
+    pCard.appendChild(txtW(p.text, F.r, 12, C.muted, princColW - 32, 18));
+
+    if (i < 3) princRow1.appendChild(pCard);
+    else princRow2.appendChild(pCard);
   }
 
-  princSec.appendChild(princGrid);
+  princSec.appendChild(princRow1);
+  princSec.appendChild(princRow2);
   root.appendChild(princSec);
 
   // ===== ROADMAP SECTION =====
   const roadSec = vSec(contentW);
   roadSec.itemSpacing = 20;
-  roadSec.appendChild(txt("Roadmap", F.b, 28, C.white, 34, null));
+  roadSec.appendChild(txt("Roadmap", F.b, 28, C.white, 34));
 
   const phases = [
     {
       name: "MVP",
       timeline: "Week 1-2",
       accent: C.green,
-      status: "ACTIVE",
+      status: "DONE",
       features: [
-        { text: "CEP extension skeleton (manifest.xml, panel.html, host.jsx)", done: false },
-        { text: "Main panel: Sync button + AutoSync toggle + progress bar", done: false },
-        { text: "Watch Folders panel: add/remove folders, path display", done: false },
-        { text: "Watcher module: chokidar-based file monitoring", done: false },
-        { text: "Importer module: batch import via ExtendScript bridge", done: false },
-        { text: "Extension filter: whitelist of allowed file types", done: false },
-        { text: "SUB checkbox: import/ignore subfolders", done: false },
-        { text: "Config persistence: watchFolders.json per project", done: false },
+        { text: "CEP extension skeleton (manifest.xml, panel.html, host.jsx)", done: true },
+        { text: "Main panel: Sync button + AutoSync toggle + progress bar", done: true },
+        { text: "Watch Folders panel: add/remove folders, path display", done: true },
+        { text: "Watcher module: chokidar-based file monitoring", done: true },
+        { text: "Importer module: batch import via ExtendScript bridge", done: true },
+        { text: "Extension filter: whitelist of allowed file types", done: true },
+        { text: "Subfolder import with sub-bin hierarchy", done: true },
+        { text: "Config persistence: watchFolders.json per project", done: true },
       ],
     },
     {
       name: "v1.0",
       timeline: "Week 3-5",
       accent: C.amber,
-      status: "PLANNED",
+      status: "ACTIVE",
       features: [
-        { text: "RP checkbox: relative path mode for templates", done: false },
-        { text: "SEQ checkbox: image sequence detection & import", done: false },
+        { text: "Mirror Deletions toggle: file removed from disk → remove from bin (OFF by default)", done: false },
+        { text: "Drag & drop folders from Explorer/Finder onto panel", done: false },
+        { text: "Global settings fallback → per-project override", done: false },
         { text: "FLT checkbox: flatten subfolders into single bin", done: false },
         { text: "Color label assignment per watch folder", done: false },
         { text: "Ignored folders list with regex support", done: false },
-        { text: "Drag & drop folders from Explorer/Finder onto panel", done: false },
         { text: "Settings dialog: General / Allowed Files / Ignored Folders tabs", done: false },
         { text: "Toast notifications on import complete", done: false },
-        { text: "Wait for file write completion before import", done: false },
+        { text: "RP checkbox: relative path mode for templates", done: false },
+        { text: "SEQ checkbox: image sequence detection & import", done: false },
       ],
     },
     {
@@ -381,7 +383,7 @@ async function main() {
     const phHdr = hHug();
     phHdr.itemSpacing = 12;
     phHdr.counterAxisAlignItems = "CENTER";
-    phHdr.appendChild(txt(phase.name, F.b, 22, phase.accent, null, null));
+    phHdr.appendChild(txt(phase.name, F.b, 22, phase.accent));
     phHdr.appendChild(pill(phase.timeline, phase.accent));
     phHdr.appendChild(pill(phase.status, phase.accent));
     card.appendChild(phHdr);
@@ -405,13 +407,13 @@ async function main() {
       check.cornerRadius = 4;
       if (feat.done) {
         setFill(check, C.green, 0.2);
-        check.appendChild(txt("\u2713", F.b, 12, C.green, null, null));
+        check.appendChild(txt("\u2713", F.b, 12, C.green));
       } else {
         setFill(check, C.white, 0.08);
       }
       fRow.appendChild(check);
 
-      fRow.appendChild(txt(feat.text, F.r, 13, feat.done ? C.green : C.muted, 20, null));
+      fRow.appendChild(txt(feat.text, F.r, 13, feat.done ? C.green : C.muted, 20));
       card.appendChild(fRow);
     }
 
@@ -424,8 +426,8 @@ async function main() {
   const footer = vSec(contentW);
   footer.itemSpacing = 4;
   footer.appendChild(divider(contentW, C.white, 0.1));
-  footer.appendChild(txt("github.com/tvorimchudesa/watchdog-premiere", F.r, 12, C.muted, null, null));
-  footer.appendChild(txt("Architecture follows Apple-like coding principles: SRP, Minimal Surface, Defense in Depth, SOT, DRY", F.r, 11, C.muted, null, null));
+  footer.appendChild(txt("github.com/tvorimchudesa/sheepdog-premiere", F.r, 12, C.muted));
+  footer.appendChild(txt("Architecture follows Apple-like coding principles: SRP, Minimal Surface, Defense in Depth, SOT, DRY", F.r, 11, C.muted));
   root.appendChild(footer);
 
   // Position and focus
@@ -433,7 +435,7 @@ async function main() {
   root.y = 100;
   figma.currentPage.selection = [root];
   figma.viewport.scrollAndZoomIntoView([root]);
-  figma.notify("Watchdog Roadmap generated \u2714");
+  figma.notify("SheepDog Roadmap generated \u2714");
 }
 
 main();

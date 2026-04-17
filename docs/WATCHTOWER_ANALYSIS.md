@@ -147,7 +147,7 @@ this is almost certainly a **CEP extension** (not UXP, which has limited Premier
 
 ---
 
-## Effort Estimate for Watchdog (our clone)
+## Effort Estimate for SheepDog (our clone)
 
 ### MVP (4-6 weeks for 1 developer)
 - Main panel with sync button and auto-sync toggle

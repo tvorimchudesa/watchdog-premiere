@@ -1,7 +1,7 @@
 {
   "type": "excalidraw",
   "version": 2,
-  "source": "watchdog",
+  "source": "sheepdog",
   "elements": [
     {
       "id": "title",
@@ -24,12 +24,12 @@
       "containerId": null,
       "fontSize": 36,
       "fontFamily": 1,
-      "text": "WATCHDOG — CEP Architecture",
+      "text": "SHEEPDOG — CEP Architecture",
       "textAlign": "left",
       "verticalAlign": "top",
       "autoResize": true,
       "lineHeight": 1.25,
-      "originalText": "WATCHDOG — CEP Architecture",
+      "originalText": "SHEEPDOG — CEP Architecture",
       "boundElements": [],
       "locked": false
     },

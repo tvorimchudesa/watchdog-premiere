@@ -1,0 +1,250 @@
+/* SheepDog — Premiere Pro CEP Panel */
+/* Dark theme matching Premiere Pro UI */
+
+:root {
+  --bg: #1e1e1e;
+  --bg-elevated: #2a2a2a;
+  --bg-hover: #333;
+  --border: #444;
+  --text: #e0e0e0;
+  --text-muted: #888;
+  --accent: #4a9eff;
+  --accent-hover: #6ab0ff;
+  --success: #4caf50;
+  --danger: #f44336;
+  --radius: 4px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  padding: 12px;
+  user-select: none;
+}
+
+h1 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+h2 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Buttons */
+.btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-small {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: transparent;
+  background: transparent;
+  padding: 2px 6px;
+  font-size: 14px;
+}
+
+.btn-danger:hover {
+  background: rgba(244, 67, 54, 0.15);
+}
+
+/* Controls section */
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Toggle switch */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toggle input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
+/* Folder list */
+#folder-list {
+  flex: 1;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+#folders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.folder-item .folder-path {
+  flex: 1;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-item .folder-bin {
+  color: var(--accent);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.folder-item .folder-toggle {
+  accent-color: var(--success);
+  width: 12px;
+  height: 12px;
+}
+
+.folder-flatten {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.folder-flatten input {
+  accent-color: var(--accent);
+  width: 11px;
+  height: 11px;
+}
+
+/* Progress bar */
+#progress-section {
+  margin-top: 12px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+/* Footer */
+footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Empty state */
+#empty-state {
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Drop overlay */
+#drop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(74, 158, 255, 0.12);
+  border: 2px dashed var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.drop-message {
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 16px 32px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+}

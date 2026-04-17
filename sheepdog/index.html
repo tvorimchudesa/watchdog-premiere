@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SheepDog</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>SheepDog</h1>
+      <p class="subtitle">Auto-sync folders to bins</p>
+    </header>
+
+    <section id="controls">
+      <button id="btn-sync" class="btn btn-primary">Sync All</button>
+      <label class="toggle">
+        <input type="checkbox" id="toggle-auto">
+        <span class="toggle-label">Auto Sync</span>
+      </label>
+      <label class="toggle" title="Remove from bin when file is deleted from disk">
+        <input type="checkbox" id="toggle-mirror">
+        <span class="toggle-label">Mirror Del</span>
+      </label>
+    </section>
+
+    <section id="folder-list">
+      <div class="section-header">
+        <h2>Watch Folders</h2>
+        <button id="btn-add-folder" class="btn btn-small">+ Add</button>
+      </div>
+      <div id="folders"></div>
+      <p id="empty-state" class="muted">No folders yet. Click + Add or drag a folder here.</p>
+    </section>
+
+    <div id="drop-overlay" class="hidden">
+      <div class="drop-message">Drop folder to watch</div>
+    </div>
+
+    <section id="progress-section" class="hidden">
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="progress-text" class="muted">Importing...</p>
+    </section>
+
+    <footer>
+      <p id="status" class="muted">Ready</p>
+    </footer>
+  </div>
+
+  <script src="js/lib/CSInterface.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/modules/settings-manager.js"></script>
+  <script src="js/modules/folder-manager.js"></script>
+  <script src="js/modules/importer.js"></script>
+  <script src="js/modules/watcher.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
