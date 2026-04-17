@@ -145,15 +145,71 @@
 - [Да] Auto Sync ON + добавление пустой папки → "All synced — no new files"
 - [Да] Auto Sync ON + добавление папки где все файлы уже в проекте (импорт SheepDog ИЛИ вручную через File → Import — дедуп по mediaPath) → "All synced — no new files"
 
-## 15. Reverse Mirror (bin→disk) — PLANNED
-> Удаление файла из bin в Premiere → удаление с диска. Деструктивная операция.
-> Safety-cover: 3 состояния checkbox (locked → unlocked → active) + confirm dialog.
-- [ ] TODO: реализация
+---
 
-## 16. Clean Resync — PLANNED
-> Удалить все из целевых bin-ов → импортировать заново. Nuclear option.
-> Safety-cover обязателен. Внимание: ссылки на timeline слетят.
-- [ ] TODO: реализация
+# v1.1 Features — PLANNED
+
+## 15. Ignored folders (regex/glob) — PLANNED
+> Игнорировать системный мусор и прокси-папки при сканировании.
+> Defaults: `.DS_Store`, `Thumbs.db`, `**/proxy/**`, `**/.*` (скрытые), `**/Adobe Premiere Pro Auto-Save/**`.
+> Пользователь может добавлять свои паттерны через Settings.
+- [ ] Defaults применяются сразу после установки (без настройки)
+- [ ] Папка `footage/day1/.thumbnails/` → файлы внутри не импортируются
+- [ ] `Thumbs.db` / `.DS_Store` не появляются в bin
+- [ ] Пользовательский паттерн `**/proxies/**` → соответствующие файлы пропускаются
+- [ ] Паттерны сохраняются после перезапуска
+- [ ] Статус: "Skipped N ignored files" при Sync All
+
+## 16. Image sequence support — PLANNED
+> Серии EXR/DPX/TIF/PNG (`name.NNNN.ext`) импортируются как **один клип**, не как N стиллов.
+> Критично для VFX/DI/motion workflow — без этого инструмент непригоден для renders.
+> Реализация: детектор паттернов в importer, вызов `importFiles([firstFrame], true, binPath, true)` — `asNumberedStills=true`.
+- [ ] Папка `renders/shot_010/` с `shot_010.0001.exr`–`shot_010.0100.exr` → 1 клип в bin (не 100 стиллов)
+- [ ] Клип называется по базе (`shot_010`), длительность соответствует N кадрам при project fps
+- [ ] Смешанная папка: EXR-серия + .mp4 → серия как клип, mp4 как видео
+- [ ] Несколько серий в одной папке (`shot_010.*.exr` + `shot_020.*.exr`) → 2 клипа
+- [ ] Паттерны с underscore: `shot_010_0001.exr` — работает
+- [ ] Неполная серия (пропущены кадры) → Premiere импортит с пропусками (его поведение по умолчанию)
+- [ ] Dedupe: повторный Sync All → серия не дублируется
+- [ ] Auto Sync: добавление нового кадра в существующую серию → серия обновляется (или impossible — задокументировать поведение)
+- [ ] Одиночный .exr (не серия) → импортится как still, не как sequence
+
+## 17. Color label per watch folder — PLANNED
+> Каждой watch folder можно назначить Premiere color label (violet, iris, cerulean, forest, …).
+> Все файлы из этой папки получают её label → визуальная навигация в bin.
+- [ ] В списке folder-ов появляется color picker (9 стандартных Premiere цветов)
+- [ ] Выбор цвета для папки → все импортируемые файлы получают этот label
+- [ ] Label сохраняется в `sheepdog-folders.json`
+- [ ] Существующие файлы (уже импортированные) получают label после клика "Apply color"
+- [ ] Две папки с разными цветами → файлы различимы в bin
+
+## 18. Settings dialog — PLANNED
+> Модалка с табами для управления глобальными настройками.
+> Табы: **General** (auto-save interval, UI density), **Filters** (extensions allowlist), **Ignored** (regex patterns), **About**.
+- [ ] Кнопка-шестерёнка в header панели → открывается модалка
+- [ ] Таб Filters: список расширений, add/remove, save
+- [ ] Таб Ignored: список regex/glob паттернов, add/remove, save
+- [ ] Изменения сохраняются в `sheepdog-settings.json`
+- [ ] Закрытие без save → изменения отменяются
+- [ ] Reset to defaults → стандартные значения возвращаются
+
+---
+
+# REJECTED / DEFERRED
+
+## Reverse Mirror (bin→disk) — REJECTED (2026-04-17)
+> Автоудаление с диска при удалении из bin. Отклонено после архитектурной проработки.
+> **Причины:**
+> 1. Ломает конвенцию индустрии ("delete from bin ≠ touch disk"). Pro-монтажёры имеют мышечную память против этого.
+> 2. Watchtower (наш benchmark) этой фичи не имеет — аудитория не ждёт её.
+> 3. Требует snapshot-инфраструктуры для разрешения race condition между Auto Sync (disk→bin) и Reverse Mirror (bin→disk) — цена высокая.
+> 4. Риск уничтожения мастер-ассетов на shared network drives.
+>
+> **Альтернатива (если реально попросят):** кнопка "Find orphans" — сканирует watched folders, показывает файлы которых нет в bin, пользователь явно подтверждает send-to-recycle. Без snapshot, без auto-polling.
+
+## Clean Resync — REJECTED (2026-04-17)
+> Удалить всё в целевых bin-ах и импортнуть заново. Nuclear option.
+> **Причины:** рвёт timeline references. Никто не нажмёт эту кнопку на живом проекте. Теоретическая фича без реального use case.
 
 ---
 
