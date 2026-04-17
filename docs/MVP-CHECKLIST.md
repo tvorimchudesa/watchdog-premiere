@@ -1,5 +1,7 @@
 # SheepDog MVP — Checklist
 
+<!-- Пример как комменты писать -->
+
 ## 1. Панель базово работает
 - [Да] Панель открывается без ошибок
 - [Да] Видны кнопки: Sync All, Auto Sync toggle, + Add
@@ -36,7 +38,7 @@
 - [Да] Статус: "Imported N files" 
 
 ## 5. Extension Filter (Defense in Depth)
-- [Да] Положить .txt в watched папку
+- [Да] Положить .txt в watched папку 
 - [Да] Sync All → .txt НЕ импортировался
 - [Да] .mp4/.png импортировались
 
@@ -185,27 +187,84 @@
 
 ## 18. Settings dialog — PLANNED
 > Модалка с табами для управления глобальными настройками.
-> Табы: **General** (auto-save interval, UI density), **Filters** (extensions allowlist), **Ignored** (regex patterns), **About**.
+> Табы: **General** (auto-save interval, UI density, **Show per-folder actions** toggle), **Filters** (extensions allowlist), **Ignored** (regex patterns), **About**.
 - [ ] Кнопка-шестерёнка в header панели → открывается модалка
+- [ ] Таб General: toggle "Show per-folder actions" — управляет видимостью ↻ / gear icons в folder-row
 - [ ] Таб Filters: список расширений, add/remove, save
 - [ ] Таб Ignored: список regex/glob паттернов, add/remove, save
 - [ ] Изменения сохраняются в `sheepdog-settings.json`
 - [ ] Закрытие без save → изменения отменяются
 - [ ] Reset to defaults → стандартные значения возвращаются
 
+## 19. Manual Sync per folder — PLANNED
+> Иконка ↻ в каждой folder-row — синк только этой папки (scope-limited аналог Sync All).
+> Семантика: idempotent, dedupe-aware, не трогает offline items.
+> Включается тогглом "Show per-folder actions" в Settings.
+- [ ] При "Show per-folder actions" ON → ↻ иконка в правой части каждой folder-row
+- [ ] Клик ↻ → scan этой папки → import новых файлов (dedupe)
+- [ ] Статус: "Scanning <folder>..." → "Imported N files" / "All synced — no new files"
+- [ ] Offline items остаются offline (не удаляются и не реимпортятся молча)
+- [ ] При OFF → иконка скрыта, Sync All в header работает как раньше
+- [ ] Multiple clicks → последовательная обработка без дублей
+
+## 20. Danger Zone: Reverse Mirror + per-folder actions — PLANNED
+> Collapsible секция внизу панели. Все деструктивные действия здесь.
+> Scope: per-folder (не глобально) — уменьшает blast radius.
+> Реализация: gear icon per folder-row → раскрывает Danger Zone actions для этой папки.
+> Recycle Bin only. Session undo stack. Append-only log `sheepdog-reverse-mirror.log.json`.
+
+### 20.1. Reverse Mirror per folder (manual trigger)
+- [ ] Gear icon в folder-row → expand → видны Danger Zone actions
+- [ ] Кнопка "Sync bin deletions to disk" (safety-cover 3-state: locked → unlocked → active)
+- [ ] Active → scan: files на диске в этой папке которых нет в bin → preview modal ("Send N files to Recycle: [list]")
+- [ ] Confirm → send to OS Recycle Bin (via `trash` npm)
+- [ ] Undo button доступна в сессии (не переживает перезапуск): "Undo last delete (N files)"
+- [ ] Log записан в `sheepdog-reverse-mirror.log.json` (timestamp, filePath, binPath, status)
+- [ ] Cancel в preview → ничего не удаляется
+
+### 20.2. Clean offline media per folder (manual trigger)
+> Отдельное действие: убрать из bin items чьи файлы исчезли с диска.
+> Только в этой папке, preview перед подтверждением.
+- [ ] В Danger Zone per folder → кнопка "🧹 Clean offline (N)" — счётчик актуален
+- [ ] Preview modal со списком offline items
+- [ ] Confirm → items удалены из bin (Bridge.removeFileFromBin)
+- [ ] Timeline references становятся offline в Premiere (ожидаемо — они уже были broken)
+
+## 21. Offline media indicator — PLANNED
+> Информативное отображение "что broken" без автоматических действий.
+> Pro-монтажёр сам решает что с этим делать.
+- [ ] Глобальный footer: `⚠ 3 offline` — кликабельно
+- [ ] Клик → модалка со списком: filename, parent folder, status (missing / outside watch folder)
+- [ ] Per-folder badge: маленькая цифра `(N)` возле имени папки если есть offline внутри
+- [ ] Статус обновляется: при Manual Sync / Sync All / Auto Sync tick
+- [ ] Файлы которые юзер релинкнул вне watch folders → "outside watched folders" (не удалять, не тянуть)
+
+---
+
+# KNOWN BUGS — TO INVESTIGATE
+
+## BUG-001: Sync All crash requires Premiere restart
+> Обнаружен 2026-04-17. Repro не найден.
+> **Симптом:** после некоторого действия Sync All перестаёт работать / панель зависает / import silently fails.
+> **Triggers (что помнится):** связан с Sync All, возможно после специфичной последовательности.
+> **Workaround:** полный перезапуск Premiere Pro (не просто reload панели).
+> **TODO:**
+> - [ ] Воспроизвести. Возможные факторы: большое кол-во файлов, offline items в bin, Flat mode ON, специфичные расширения
+> - [ ] Логировать последние N операций в `sheepdog-debug.log` для post-mortem
+> - [ ] Проверить: есть ли exception в DevTools console в момент бага
+> - [ ] Проверить: есть ли ошибка в ExtendScript (Bridge.diagnose перед Sync All)
+> - [ ] Если repro найден — баг чинится и этот пункт закрывается
+
 ---
 
 # REJECTED / DEFERRED
 
-## Reverse Mirror (bin→disk) — REJECTED (2026-04-17)
-> Автоудаление с диска при удалении из bin. Отклонено после архитектурной проработки.
-> **Причины:**
-> 1. Ломает конвенцию индустрии ("delete from bin ≠ touch disk"). Pro-монтажёры имеют мышечную память против этого.
-> 2. Watchtower (наш benchmark) этой фичи не имеет — аудитория не ждёт её.
-> 3. Требует snapshot-инфраструктуры для разрешения race condition между Auto Sync (disk→bin) и Reverse Mirror (bin→disk) — цена высокая.
-> 4. Риск уничтожения мастер-ассетов на shared network drives.
+## Reverse Mirror (bin→disk) as AUTO — REJECTED (2026-04-17)
+> Авто-polling версия (автоматическая синхра bin→disk при каждом tick) отклонена.
+> **Причина:** race condition с Auto Sync (disk→bin) без snapshot-инфраструктуры.
+> **Заменено на §20.1:** manual trigger per folder в Danger Zone.
 >
-> **Альтернатива (если реально попросят):** кнопка "Find orphans" — сканирует watched folders, показывает файлы которых нет в bin, пользователь явно подтверждает send-to-recycle. Без snapshot, без auto-polling.
+> Идея manual-версии сохраняет ценность (юзер хочет чистить disk от deleted-from-bin) без рисков автоматики.
 
 ## Clean Resync — REJECTED (2026-04-17)
 > Удалить всё в целевых bin-ах и импортнуть заново. Nuclear option.
