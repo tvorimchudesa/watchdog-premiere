@@ -196,6 +196,22 @@
   }
 
   /**
+   * Initial scan for a single folder. Used when a folder is newly added
+   * while Auto Sync is ON — matches user mental model of "auto means auto".
+   * Dedupe on the ExtendScript side prevents duplicate imports.
+   */
+  function syncFolder(folder) {
+    if (!folder || !folder.enabled) return;
+    setStatus("Scanning " + (path ? path.basename(folder.path) : folder.path) + "...");
+    scanFolder(folder.path, folder, folder.subfolders);
+    if (Importer.queueLength() === 0) {
+      setStatus("All synced — no new files");
+      return;
+    }
+    Importer.flush();
+  }
+
+  /**
    * Recursively scan a folder and enqueue files.
    */
   function scanFolder(dirPath, folderConfig, recurse) {
@@ -338,7 +354,10 @@
 
     if (isOn) {
       Watcher.start(FolderManager.getEnabled());
-      setStatus("Auto Sync ON — watching " + FolderManager.getEnabled().length + " folders");
+      // Auto Sync ON means "make the project match the folders" — scan existing
+      // content, not just watch for future events. Otherwise user adds 500 files,
+      // toggles Auto Sync, sees nothing happen and assumes the tool is broken.
+      syncAll();
     } else {
       Watcher.stop();
       setStatus("Auto Sync OFF");
@@ -362,9 +381,12 @@
 
     var folder = FolderManager.add(folderPath);
 
-    // Start watching if autoSync is on
+    // Start watching if autoSync is on, then do initial scan of existing files.
+    // Without the initial scan, "Auto Sync" only watches future events, which
+    // breaks the user's mental model of the label.
     if (toggleAuto.checked) {
       Watcher.addFolder(folder);
+      syncFolder(folder);
     }
 
     renderFolders();
@@ -390,6 +412,7 @@
     var folder = FolderManager.add(folderPath);
     if (toggleAuto.checked) {
       Watcher.addFolder(folder);
+      syncFolder(folder);
     }
     renderFolders();
   }
