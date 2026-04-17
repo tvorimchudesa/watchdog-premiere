@@ -66,6 +66,63 @@
 
 ---
 
-**Дата тестирования:** 16042026
+# v1.0 Features
+
+## 10. Drag & Drop
+> Перетащить папку из Explorer прямо на панель SheepDog.
+- [Да] Перетащить папку на панель → появляется синий overlay "Drop folder to watch"
+- [Да] Отпустить → папка добавляется в список
+- [Да] Перетащить файл (не папку) → статус "Drop a folder, not files"
+- [Да] Перетащить уже добавленную папку → статус "Already watching: ..."
+- [Да] Перетащить 2 папки одновременно → обе добавляются
+
+## 11. Mirror Deletions (disk→bin)
+> При удалении файла с диска — удаляется из bin в Premiere. Только disk→bin, НЕ наоборот.
+> **Known limitation:** Premiere Pro лочит медиафайлы после импорта. Удалить файл с диска можно только если он не используется на timeline или после удаления из bin.
+- [Да] Включить Auto Sync + включить toggle **Mirror Del**
+- [Да] Добавить watch folder, Sync All → файлы в bin
+- [Нет] Удалить файл из watch folder на диске <!-- Premiere лочит файл. Known limitation — см. выше -->
+- [Нет] Через ~3 сек файл удалён из bin в Premiere
+- [Нет] Выключить Mirror Del → удалить файл с диска → в bin остаётся
+- [Нет] Подпапка: удалить файл из `footage/day1/cam_a/` → удаляется из sub-bin `cam_a`
+
+> **Workaround для теста:** удалить файл из bin в Premiere, затем удалить с диска — lock снимется. Или тестировать с файлами которые не на timeline.
+
+## 12. Flatten Mode + Safety-cover
+> Flatten теперь использует safety-cover UI (3 клика: locked → unlocked → active).
+> При активации: moveBin — файлы перемещаются из sub-bin-ов в корень (timeline не слетает).
+> При деактивации: unflatten — файлы возвращаются в sub-bin-ы по disk path.
+- [Да] Добавить папку с подпапками, Sync All → создаются sub-bin-ы
+- [Да] Кнопка Flat — серая (locked). Один клик → белая рамка (unlocked)
+- [Да] Второй клик → активация: файлы перемещаются из sub-bin-ов в корень bin <!-- Но выскакивает ошибка child.remove is not a funtion. Subbins остались  -->
+- [Да] Статус: "Flattened — moved N files"
+- [Да] Пустые sub-bin-ы удалены (пробуем deleteItems → remove fallback)
+- [Да] Файлы на timeline всё ещё работают (moveBin, не re-import)
+- [Да] С Auto Sync: новый файл в подпапке → попадает в корневой bin (не в sub-bin)
+- [Да] Клик на активный Flat → unflatten: файлы возвращаются в sub-bin-ы
+- [Да] Статус: "Unflattened — moved N files"
+- [Да] Перезапуск панели → состояние Flat сохранилось
+
+## 13. Dedupe при импорте
+> Встроено в importFilesToBin (ExtendScript). Перед импортом проверяет все mediaPath в проекте.
+- [Да] Добавить папку, Sync All → файлы в bin
+- [Да] Повторно Sync All → статус "All synced — no new files" (дубликаты не создаются)
+- [Да] Включить Flat, Sync All → новые файлы не дублируют существующие
+- [Да] Auto Sync: файл уже в проекте → повторно не импортируется
+
+## 14. Reverse Mirror (bin→disk) — PLANNED
+> Удаление файла из bin в Premiere → удаление с диска. Деструктивная операция.
+> Safety-cover: 3 состояния checkbox (locked → unlocked → active) + confirm dialog.
+- [ ] TODO: реализация
+
+## 15. Clean Resync — PLANNED
+> Удалить все из целевых bin-ов → импортировать заново. Nuclear option.
+> Safety-cover обязателен. Внимание: ссылки на timeline слетят.
+- [ ] TODO: реализация
+
+---
+
+**Дата тестирования:** 16-17.04.2026
 **Версия Premiere:** 25
-**Результат:** ____________________
+**Результат MVP:** Всё ок
+**Результат v1.0:** ____________________

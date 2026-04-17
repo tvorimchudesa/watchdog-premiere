@@ -80,19 +80,67 @@
       bin.className = "folder-bin";
       bin.textContent = "\u2192 " + folder.targetBin;
 
-      var flattenLabel = document.createElement("label");
-      flattenLabel.className = "folder-flatten";
-      flattenLabel.title = "Flatten: all subfolder files go into one bin";
-      var flattenCheck = document.createElement("input");
-      flattenCheck.type = "checkbox";
-      flattenCheck.checked = folder.flatten || false;
-      flattenCheck.addEventListener("change", function () {
-        FolderManager.update(folder.id, { flatten: flattenCheck.checked });
-      });
-      var flattenText = document.createElement("span");
-      flattenText.textContent = "Flat";
-      flattenLabel.appendChild(flattenCheck);
-      flattenLabel.appendChild(flattenText);
+      // Safety-cover for Flatten: locked → unlocked → active
+      var flatCover = document.createElement("div");
+      flatCover.className = "safety-cover";
+      flatCover.title = "Flatten: move all subfolder files into one bin (click twice to activate)";
+      flatCover.setAttribute("data-state", folder.flatten ? "active" : "locked");
+      var flatBox = document.createElement("div");
+      flatBox.className = "safety-box";
+      var flatLabel = document.createElement("span");
+      flatLabel.className = "safety-label";
+      flatLabel.textContent = "Flat";
+      flatCover.appendChild(flatBox);
+      flatCover.appendChild(flatLabel);
+
+      (function (fc, folderId, folderPath, targetBin) {
+        fc.addEventListener("click", function () {
+          var state = fc.getAttribute("data-state");
+
+          if (state === "locked") {
+            // locked → unlocked (cover open, not yet active)
+            fc.setAttribute("data-state", "unlocked");
+          } else if (state === "unlocked") {
+            // unlocked → active: flatten the bin
+            setStatus("Flattening " + targetBin + "...");
+            Bridge.flattenBin(targetBin).then(function (result) {
+              if (result.success) {
+                fc.setAttribute("data-state", "active");
+                FolderManager.update(folderId, { flatten: true });
+                setStatus("Flattened \u2014 moved " + result.moved + " file" + (result.moved !== 1 ? "s" : ""));
+              } else {
+                fc.setAttribute("data-state", "locked");
+                setStatus("Flatten failed: " + (result.error || "unknown"));
+              }
+            }).catch(function (err) {
+              fc.setAttribute("data-state", "locked");
+              setStatus("Flatten error: " + err.message);
+            });
+          } else if (state === "active") {
+            // active → locked: unflatten (restore sub-bins)
+            fc.setAttribute("data-state", "unlocked");
+            // Second click on unlocked confirms unflatten
+            var confirmUnflatten = function () {
+              fc.removeEventListener("click", confirmUnflatten);
+            };
+            // Actually, go straight to unflatten for simplicity:
+            setStatus("Unflattening " + targetBin + "...");
+            Bridge.unflattenBin(targetBin, folderPath).then(function (result) {
+              if (result.success) {
+                fc.setAttribute("data-state", "locked");
+                FolderManager.update(folderId, { flatten: false });
+                setStatus("Unflattened \u2014 moved " + result.moved + " file" + (result.moved !== 1 ? "s" : ""));
+              } else {
+                fc.setAttribute("data-state", "active");
+                setStatus("Unflatten failed: " + (result.error || "unknown"));
+              }
+            }).catch(function (err) {
+              fc.setAttribute("data-state", "active");
+              setStatus("Unflatten error: " + err.message);
+            });
+          }
+        });
+      })(flatCover, folder.id, folder.path, folder.targetBin);
 
       var removeBtn = document.createElement("button");
       removeBtn.className = "btn btn-danger";
@@ -106,7 +154,7 @@
       item.appendChild(toggle);
       item.appendChild(pathEl);
       item.appendChild(bin);
-      item.appendChild(flattenLabel);
+      item.appendChild(flatCover);
       item.appendChild(removeBtn);
       foldersContainer.appendChild(item);
     });
@@ -179,8 +227,12 @@
 
   Importer.onComplete(function (result) {
     hideProgress();
-    setStatus("Imported " + result.imported + " file" + (result.imported !== 1 ? "s" : "") +
-      (result.errors > 0 ? " (" + result.errors + " failed)" : ""));
+    if (result.imported === 0 && result.errors === 0) {
+      setStatus("All synced \u2014 no new files");
+    } else {
+      setStatus("Imported " + result.imported + " file" + (result.imported !== 1 ? "s" : "") +
+        (result.errors > 0 ? " (" + result.errors + " failed)" : ""));
+    }
   });
 
   // --- Wire up Watcher → Importer ---
@@ -227,8 +279,25 @@
         return;
       }
 
-      // Get project path to initialize persistence
-      return Bridge.getProjectPath().then(function (projPath) {
+      // Startup health check — surface broken ExtendScript state immediately
+      // instead of failing silently when user tries to import.
+      return Bridge.diagnose().then(function (env) {
+        if (!env.ok) {
+          var broken = [];
+          if (!env.jsonOk) broken.push("JSON");
+          if (!env.appOk) broken.push("app");
+          if (!env.projectOk) broken.push("no project open");
+          if (!env.rootItemOk) broken.push("rootItem");
+          if (!env.binApiOk) broken.push("ProjectItemType");
+          if (!env.importApiOk) broken.push("importFiles");
+          setStatus("ExtendScript broken: " + broken.join(", "));
+          console.error("[SheepDog] diagnose failed:", env);
+          renderFolders();
+          throw new Error("diagnose_failed");
+        }
+
+        return Bridge.getProjectPath();
+      }).then(function (projPath) {
         if (projPath && path) {
           projectDir = path.dirname(projPath);
           SettingsManager.init(projectDir);
@@ -248,9 +317,13 @@
         setStatus("Connected to Premiere Pro");
         renderFolders();
       });
-    }).catch(function () {
-      setStatus("Panel loaded (standalone mode)");
-      renderFolders();
+    }).catch(function (err) {
+      // Preserve diagnose-specific status; only fall back to standalone
+      // for genuine connection errors (ping failure, bridge offline).
+      if (!err || err.message !== "diagnose_failed") {
+        setStatus("Panel loaded (standalone mode)");
+        renderFolders();
+      }
     });
   }
 

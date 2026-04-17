@@ -1,21 +1,20 @@
 /*
  * SheepDog - ExtendScript host for Premiere Pro
- * ES3 syntax only (ExtendScript = ECMAScript 3)
- * Premiere's ExtendScript has NO native JSON - polyfill below.
+ * ES3 syntax only (ExtendScript = ECMAScript 3).
+ * Premiere's ExtendScript has NO native JSON object - polyfill below.
+ * Without it every Bridge call fails with opaque "EvalScript error."
  */
 
 if (typeof JSON === "undefined") {
   JSON = {
     parse: function (s) { return eval("(" + s + ")"); },
     stringify: function (o) {
-      if (o === null) return "null";
-      if (typeof o === "undefined") return "null";
+      if (o === null || typeof o === "undefined") return "null";
       if (typeof o === "string") {
         return '"' + o.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t") + '"';
       }
       if (typeof o === "number" || typeof o === "boolean") return String(o);
-      var parts = [];
-      var i;
+      var parts = [], i;
       if (o instanceof Array || (typeof o.length === "number" && typeof o.splice === "function")) {
         for (i = 0; i < o.length; i++) parts.push(JSON.stringify(o[i]));
         return "[" + parts.join(",") + "]";
@@ -26,6 +25,17 @@ if (typeof JSON === "undefined") {
       return "{" + parts.join(",") + "}";
     }
   };
+}
+
+// Failsafe error formatter - uses only primitives, survives even if JSON is broken.
+// Catch blocks MUST use this instead of JSON.stringify, otherwise a broken JSON
+// would make catch-block itself throw -> unhandled -> opaque "EvalScript error."
+function errResult(fn, e) {
+  var msg = "";
+  try { msg = String(e); } catch (ignore) { msg = "unknown error"; }
+  var line = "";
+  try { if (e && e.line) line = "@L" + e.line; } catch (ignore2) {}
+  return '{"success":false,"error":"' + fn + ': ' + msg.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + ' ' + line + '"}';
 }
 
 /**
@@ -43,26 +53,57 @@ function importFilesToBin(jsonArgs) {
       return JSON.stringify({ success: false, imported: 0, error: "No paths provided" });
     }
 
+    // Dedupe: skip files already imported (match by media path across whole project)
+    var existing = {};
+    collectMediaPaths(app.project.rootItem, existing);
+
+    var newPaths = [];
+    for (var i = 0; i < paths.length; i++) {
+      var normalized = paths[i].replace(/\\/g, "/").toLowerCase();
+      if (!existing[normalized]) newPaths.push(paths[i]);
+    }
+
+    if (newPaths.length === 0) {
+      return JSON.stringify({ success: true, imported: 0, skipped: paths.length });
+    }
+
     // Find or create target bin
     var targetBin = findOrCreateBin(binPath);
     if (!targetBin) {
       return JSON.stringify({ success: false, imported: 0, error: "Cannot find/create bin: " + binPath });
     }
 
-    // Import files
-    var importSuccess = app.project.importFiles(
-      paths,          // array of file paths
-      false,          // suppressUI
-      targetBin,      // target bin
-      false           // importAsNumberedStills
-    );
+    // Import only new files
+    var importSuccess = app.project.importFiles(newPaths, false, targetBin, false);
 
     return JSON.stringify({
       success: importSuccess,
-      imported: importSuccess ? paths.length : 0,
+      imported: importSuccess ? newPaths.length : 0,
+      skipped: paths.length - newPaths.length,
     });
   } catch (e) {
-    return JSON.stringify({ success: false, imported: 0, error: String(e) });
+    return errResult("importFilesToBin", e);
+  }
+}
+
+/**
+ * Recursively collect all media paths in the project.
+ * Used by dedupe to avoid re-importing files that already exist anywhere.
+ * @param {Object} item - ProjectItem (bin)
+ * @param {Object} result - hash map (normalized lowercase forward-slash path -> true)
+ */
+function collectMediaPaths(item, result) {
+  if (!item || !item.children) return;
+  for (var i = 0; i < item.children.numItems; i++) {
+    var child = item.children[i];
+    if (child.type === ProjectItemType.BIN) {
+      collectMediaPaths(child, result);
+    } else {
+      var mediaPath = child.getMediaPath ? child.getMediaPath() : "";
+      if (mediaPath) {
+        result[mediaPath.replace(/\\/g, "/").toLowerCase()] = true;
+      }
+    }
   }
 }
 
@@ -126,7 +167,7 @@ function createBin(jsonArgs) {
     );
     return JSON.stringify({ success: bin !== null });
   } catch (e) {
-    return JSON.stringify({ success: false, error: String(e) });
+    return errResult("createBin", e);
   }
 }
 
@@ -194,14 +235,168 @@ function removeFileFromBin(jsonArgs) {
 
     return JSON.stringify({ success: false, error: "File not found in bin" });
   } catch (e) {
-    return JSON.stringify({ success: false, error: String(e) });
+    return errResult("removeFileFromBin", e);
   }
 }
 
 /**
- * Health check — verify ExtendScript is reachable.
+ * Check which files are NOT yet in the project (dedupe preview, no import).
+ * Mostly used for UI hinting; importFilesToBin already dedupes internally.
+ * @param {string} jsonArgs - JSON: { paths: string[] }
+ * @returns {string} JSON: { newPaths: string[] }
+ */
+function dedupeFiles(jsonArgs) {
+  try {
+    var args = JSON.parse(jsonArgs);
+    var paths = args.paths || [];
+    var existing = {};
+    collectMediaPaths(app.project.rootItem, existing);
+    var newPaths = [];
+    for (var i = 0; i < paths.length; i++) {
+      var normalized = paths[i].replace(/\\/g, "/").toLowerCase();
+      if (!existing[normalized]) newPaths.push(paths[i]);
+    }
+    return JSON.stringify({ newPaths: newPaths });
+  } catch (e) {
+    return errResult("dedupeFiles", e);
+  }
+}
+
+/**
+ * Flatten a bin: move all files from sub-bins into target bin, then delete empty sub-bins.
+ * Uses moveBin() to preserve timeline references (vs re-import which breaks them).
+ * @param {string} jsonArgs - JSON: { binPath: string }
+ * @returns {string} JSON: { success: boolean, moved: number, error?: string }
+ */
+function flattenBin(jsonArgs) {
+  try {
+    var args = JSON.parse(jsonArgs);
+    var targetBin = findOrCreateBin(args.binPath);
+    if (!targetBin) {
+      return JSON.stringify({ success: false, moved: 0, error: "Bin not found: " + args.binPath });
+    }
+
+    // Collect all non-bin items from sub-bins depth-first, with their source bin.
+    var items = [];
+    function collectItems(bin) {
+      for (var i = bin.children.numItems - 1; i >= 0; i--) {
+        var child = bin.children[i];
+        if (child.type === ProjectItemType.BIN) {
+          collectItems(child);
+        } else {
+          items.push(child);
+        }
+      }
+    }
+
+    // Only collect from sub-bins, not from targetBin itself.
+    var subBins = [];
+    for (var i = targetBin.children.numItems - 1; i >= 0; i--) {
+      var child = targetBin.children[i];
+      if (child.type === ProjectItemType.BIN) {
+        subBins.push(child);
+        collectItems(child);
+      }
+    }
+
+    // Move all items into targetBin (preserves timeline refs).
+    var moved = 0;
+    for (var j = 0; j < items.length; j++) {
+      items[j].moveBin(targetBin);
+      moved++;
+    }
+
+    // Delete now-empty sub-bins. deleteBin is the correct Premiere API for bin removal.
+    for (var k = 0; k < subBins.length; k++) {
+      try { subBins[k].deleteBin(); } catch (ignore) {}
+    }
+
+    return JSON.stringify({ success: true, moved: moved });
+  } catch (e) {
+    return errResult("flattenBin", e);
+  }
+}
+
+/**
+ * Unflatten a bin: move files from target bin back into sub-bins that mirror disk layout.
+ * Uses moveBin() to preserve timeline references.
+ * @param {string} jsonArgs - JSON: { binPath: string, watchFolderPath: string }
+ * @returns {string} JSON: { success: boolean, moved: number, error?: string }
+ */
+function unflattenBin(jsonArgs) {
+  try {
+    var args = JSON.parse(jsonArgs);
+    var targetBin = findOrCreateBin(args.binPath);
+    if (!targetBin) {
+      return JSON.stringify({ success: false, moved: 0, error: "Bin not found: " + args.binPath });
+    }
+
+    var watchFolder = args.watchFolderPath.replace(/\\/g, "/").toLowerCase();
+    if (watchFolder.charAt(watchFolder.length - 1) !== "/") watchFolder += "/";
+
+    var moved = 0;
+
+    // Snapshot direct children first - moving during iteration shifts indices.
+    var flatItems = [];
+    for (var i = 0; i < targetBin.children.numItems; i++) {
+      var child = targetBin.children[i];
+      if (child.type !== ProjectItemType.BIN) flatItems.push(child);
+    }
+
+    for (var j = 0; j < flatItems.length; j++) {
+      var item = flatItems[j];
+      var mediaPath = item.getMediaPath ? item.getMediaPath() : "";
+      if (!mediaPath) continue;
+
+      var normalized = mediaPath.replace(/\\/g, "/").toLowerCase();
+      if (normalized.indexOf(watchFolder) !== 0) continue;
+
+      var relativePath = normalized.substring(watchFolder.length);
+      var parts = relativePath.split("/");
+      if (parts.length <= 1) continue; // file sits directly in watch folder root
+
+      var subBinParts = parts.slice(0, parts.length - 1);
+      var subBinPath = args.binPath + "/" + subBinParts.join("/");
+
+      var subBin = findOrCreateBin(subBinPath);
+      if (subBin) {
+        item.moveBin(subBin);
+        moved++;
+      }
+    }
+
+    return JSON.stringify({ success: true, moved: moved });
+  } catch (e) {
+    return errResult("unflattenBin", e);
+  }
+}
+
+/**
+ * Health check - verify ExtendScript is reachable.
  * @returns {string} "ok"
  */
 function ping() {
   return "ok";
+}
+
+/**
+ * Environment self-check. Runs at panel startup to detect broken
+ * ExtendScript state (missing JSON, no project open, missing APIs).
+ * Returns plain-string "key=value;..." format so it works even if
+ * JSON polyfill itself broke.
+ * @returns {string} "jsonOk=1;appOk=1;projectOk=1;binApiOk=1" or failures
+ */
+function diagnose() {
+  var result = "";
+  try {
+    result += "jsonOk=" + (typeof JSON !== "undefined" && JSON.stringify && JSON.parse ? "1" : "0") + ";";
+    result += "appOk=" + (typeof app !== "undefined" ? "1" : "0") + ";";
+    result += "projectOk=" + (typeof app !== "undefined" && app.project ? "1" : "0") + ";";
+    result += "rootItemOk=" + (typeof app !== "undefined" && app.project && app.project.rootItem ? "1" : "0") + ";";
+    result += "binApiOk=" + (typeof ProjectItemType !== "undefined" ? "1" : "0") + ";";
+    result += "importApiOk=" + (typeof app !== "undefined" && app.project && typeof app.project.importFiles === "function" ? "1" : "0") + ";";
+  } catch (e) {
+    result += "diagnoseError=" + String(e) + ";";
+  }
+  return result;
 }

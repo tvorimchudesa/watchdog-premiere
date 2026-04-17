@@ -125,6 +125,7 @@ var Importer = (function () {
         var paths = groups[bin];
         index++;
 
+        // Dedupe is built into importFilesToBin (ExtendScript side)
         return Bridge.importFiles(paths, bin)
           .then(function (result) {
             if (result.success) {

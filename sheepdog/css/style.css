@@ -174,20 +174,68 @@ h2 {
   height: 12px;
 }
 
-.folder-flatten {
+/* Safety-cover: 3-state toggle (cockpit flip-cover metaphor)
+   States: locked (grey) → unlocked (white border) → active (filled) */
+.safety-cover {
   display: flex;
   align-items: center;
   gap: 3px;
   font-size: 10px;
-  color: var(--text-muted);
-  cursor: pointer;
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
 }
 
-.folder-flatten input {
-  accent-color: var(--accent);
-  width: 11px;
-  height: 11px;
+.safety-cover .safety-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1.5px solid #555;
+  background: transparent;
+  transition: all 0.15s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.safety-cover .safety-label {
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+
+/* State: locked (default) — grey, closed */
+.safety-cover[data-state="locked"] .safety-box {
+  border-color: #555;
+  background: #333;
+}
+
+/* State: unlocked — white border, empty */
+.safety-cover[data-state="unlocked"] .safety-box {
+  border-color: var(--text);
+  background: transparent;
+}
+
+.safety-cover[data-state="unlocked"] .safety-label {
+  color: var(--text);
+}
+
+/* State: active — filled accent */
+.safety-cover[data-state="active"] .safety-box {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.safety-cover[data-state="active"] .safety-box::after {
+  content: "\2713";
+  position: absolute;
+  top: -1px;
+  left: 1px;
+  font-size: 10px;
+  color: #fff;
+  line-height: 12px;
+}
+
+.safety-cover[data-state="active"] .safety-label {
+  color: var(--accent);
 }
 
 /* Progress bar */

@@ -90,11 +90,62 @@ var Bridge = (function () {
     },
 
     /**
+     * Filter out files already imported in the project (dedupe by mediaPath).
+     * @param {string[]} paths - Absolute file paths to check
+     * @returns {Promise<{newPaths: string[]}>}
+     */
+    dedupeFiles: function (paths) {
+      return call("dedupeFiles", { paths: paths });
+    },
+
+    /**
+     * Flatten a bin: move all sub-bin files into root bin, remove empty sub-bins.
+     * Timeline references preserved (moveBin, not re-import).
+     * @param {string} binPath - Target bin path
+     * @returns {Promise<{success: boolean, moved: number, error?: string}>}
+     */
+    flattenBin: function (binPath) {
+      return call("flattenBin", { binPath: binPath });
+    },
+
+    /**
+     * Unflatten a bin: move files back into sub-bins based on disk path.
+     * Timeline references preserved (moveBin, not re-import).
+     * @param {string} binPath - Target bin path
+     * @param {string} watchFolderPath - Absolute path to watch folder on disk
+     * @returns {Promise<{success: boolean, moved: number, error?: string}>}
+     */
+    unflattenBin: function (binPath, watchFolderPath) {
+      return call("unflattenBin", { binPath: binPath, watchFolderPath: watchFolderPath });
+    },
+
+    /**
      * Health check.
      * @returns {Promise<string>} "ok" if connected
      */
     ping: function () {
       return call("ping");
+    },
+
+    /**
+     * Environment self-check. Returns parsed diagnose() result.
+     * Use at panel startup to detect broken ExtendScript state.
+     * @returns {Promise<{jsonOk, appOk, projectOk, rootItemOk, binApiOk, importApiOk, ok}>}
+     */
+    diagnose: function () {
+      return call("diagnose").then(function (raw) {
+        var out = { ok: true };
+        var parts = String(raw).split(";");
+        for (var i = 0; i < parts.length; i++) {
+          var kv = parts[i].split("=");
+          if (kv.length === 2 && kv[0]) {
+            var key = kv[0], val = kv[1];
+            out[key] = val === "1" ? true : (val === "0" ? false : val);
+            if (val === "0") out.ok = false;
+          }
+        }
+        return out;
+      });
     },
   };
 })();
