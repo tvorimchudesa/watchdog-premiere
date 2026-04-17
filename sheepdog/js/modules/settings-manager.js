@@ -26,6 +26,8 @@ var SettingsManager = (function () {
     autoSync: false,
     mirrorDeletions: false,
     importSubfolders: true,
+    debugMode: false,
+    bridgeTimeoutMs: 30000,
   };
 
   /**

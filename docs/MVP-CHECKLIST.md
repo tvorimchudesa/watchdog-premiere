@@ -155,35 +155,108 @@
 > **Приоритет:** ДО фич v1.1. Без этого BUG-001 продолжит убивать сессии без диагностики.
 > Three-in-one: разблокировать зависшие Promise, дать юзеру exit, собрать данные для repro.
 
-### 14.5.1. Bridge timeout
-> Каждый `Bridge.call(fn, args)` должен иметь timeout (default 60s).
-> Если callback не вернулся — reject с маркированной ошибкой "BRIDGE_TIMEOUT".
-- [ ] `Bridge.call` обёрнут в `Promise.race([callPromise, timeoutPromise])`
-- [ ] Timeout 60s default, конфигурится через settings
-- [ ] Error message: `"BRIDGE_TIMEOUT: <fnName> did not respond within 60s"`
-- [ ] Тест: искусственно замедлить ExtendScript (`$.sleep(65000)`) → panel получает timeout error, не висит
-- [ ] После timeout: UI разблокирован, статус показывает ошибку, дальнейшие операции работают
+### 14.5.1. Bridge per-call timeout (hard safety net)
+> Каждый `Bridge.call(fn, args)` имеет timeout default **30s** (per-call, не per-total).
+> Назначение: защита от "user not present" (ноут ушёл в sleep, скрытая модалка Premiere).
+> Cancel button (§14.5.2) обслуживает "user present" — не ждёт timeout.
 
-### 14.5.2. Cancel button во время импорта
-> Во время активного Sync All / Manual Sync — кнопка Cancel.
-> Клик → `Importer.cancel()` → queue очищается, pending Promise reject'ится с "CANCELLED".
-- [ ] Во время импорта Sync All / Manual заменяется на Cancel button
-- [ ] Клик Cancel → импорт прерывается, статус "Cancelled by user — N of M imported"
-- [ ] После Cancel: state чистый, можно запускать новый импорт
-- [ ] Auto Sync tick тоже cancellable (хотя обычно быстрый)
+> **Как тестить (DevTools → Chrome `http://localhost:8088` → панель SheepDog):**
+> ```js
+> // 1. Проверить default
+> Bridge.getDefaultTimeout()                 // → 30000
+>
+> // 2. Искусственно замедлить timeout для теста
+> Bridge.setDefaultTimeout(2000)             // 2 секунды
+>
+> // 3. Запустить Sync All на папке с несколькими .mp4 файлами
+> //    → через ~2s статус: "Imported 0 file (N failed)" или ошибка в console
+> //    → панель разблокирована, можно добавлять папки
+>
+> // 4. Вернуть нормальное значение
+> Bridge.setDefaultTimeout(30000)
+>
+> // 5. Sync All работает как обычно
+> ```
 
-### 14.5.3. Debug mode + log file
+- [ ] `Bridge.getDefaultTimeout()` возвращает `30000` после старта
+- [ ] `Bridge.setDefaultTimeout(2000)` + Sync All → timeout срабатывает, импорт не висит
+- [ ] Error виден в DevTools console: `"BRIDGE_TIMEOUT: importFilesToBin did not respond within 2000ms"`
+- [ ] После timeout UI разблокирован, Cancel button исчезает, можно запустить новый Sync All
+- [ ] `setDefaultTimeout(30000)` восстанавливает default, нормальный импорт работает
+
+### 14.5.2. Cancel button visible from t=0
+> Cancel доступна **с секунды 0** импорта — юзер сам решает когда stop.
+> Cancel cancel'ит текущий pending Bridge call (не ждёт timeout) и очищает queue.
+
+> **Как тестить:**
+> Подготовь папку с ~30+ mp4/png файлами (чтобы импорт был заметно долгим).
+> 1. Sync All → сразу видна красная кнопка Cancel рядом с "Importing 0/30..."
+> 2. Жми Cancel в первые 1-2 секунды
+> 3. Статус моментально: `"Cancelled — X of Y imported"`
+> 4. Добавь новую папку + Sync All → работает нормально (state чистый)
+> 5. Повтори с Auto Sync ON (добавь папку при Auto Sync) → Cancel тоже доступен
+
+- [ ] Cancel button появляется одновременно со статусом "Importing..." (секунда 0)
+- [ ] Клик Cancel → статус меняется на "Cancelled — X of Y imported" моментально (не ждём timeout)
+- [ ] Progress bar исчезает, Cancel button исчезает
+- [ ] Повторный Sync All сразу после Cancel работает
+- [ ] Cancel во время initial scan (Auto Sync ON + добавление папки) тоже работает
+
+### 14.5.3. Batch chunking (natural progress)
+> Importer разбивает queue на **chunks по 5-10 файлов** per Bridge.importFiles call.
+> Прогресс "X of N" обновляется после каждого chunk → юзер видит движение каждые 2-3s.
+> Per-batch timeout (§14.5.1) → один завис не убивает весь импорт.
+
+> **Как тестить:**
+> Папка с **25-50** медиа-файлами (не 3-5 — важен сам факт множественных chunks).
+> 1. Sync All → прогресс "0/40" → через ~секунду "10/40" → "20/40" → ...
+> 2. Должно быть **несколько обновлений** статуса, не одно "0/40" и сразу "40/40"
+> 3. Если хочешь увидеть stall hint: в DevTools `Importer.setStallMs(1500)` + Sync All → после ~1.5s прогресса статус меняется на "Importing... this batch is slow (chunk X/Y)"
+> 4. Верни `Importer.setStallMs(10000)` чтобы stall hint не мешал
+
+- [ ] Sync All с 25+ файлами → прогресс обновляется пошагово (видны минимум 3 промежуточных значения)
+- [ ] Default chunk size = 10 (проверь в `sheepdog/js/modules/importer.js:21`)
+- [ ] Final status нормальный: "Imported N files" (или с `(M failed)` если были ошибки)
+- [ ] Stall hint: `Importer.setStallMs(1500)` + Sync All → статус "...this batch is slow..." появляется
+- [ ] Error в одном chunk (напр timeout) → остальные chunks продолжают работать, в финале "N imported (M failed)"
+
+### 14.5.4. Debug mode + log file
 > Event trace в `sheepdog-debug.log` рядом с проектом. Off by default.
-> Log format: `[ISO-timestamp] [level] [component] message`
+> Log format: `[ISO-timestamp] [LEVEL] [component] message`
 > Level: INFO / WARN / ERROR
 > Append-only, rotate при > 10 MB (keep last 3 files).
-- [ ] Toggle "Debug mode" в Settings → General
-- [ ] OFF default: ничего не пишется (быстро, privacy)
-- [ ] ON: log высокоуровневых событий — Sync started/finished, Import batch progress, Bridge call/return, Errors
-- [ ] НЕ логируем: архитектурные internals (dedupe algorithm details, sequence patterns) — только event trace
-- [ ] Максимум 10 MB, после — rotate (`.1`, `.2`, `.3` suffixes)
-- [ ] Кнопка "Open log folder" в Settings → About
-- [ ] Юзер может послать log файл в bug report
+
+> **Как тестить (DevTools консоль):**
+> ```js
+> // 1. Включить debug mode
+> Logger.isEnabled()                         // → false (default)
+> Logger.setEnabled(true)
+>
+> // 2. Узнать куда пишется
+> Logger.getPath()                           // → "C:/.../project-folder/sheepdog-debug.log"
+>
+> // 3. Триггернуть события
+> //    - Нажми Sync All в панели
+> //    - Toggle Auto Sync ON/OFF
+> //    - Нажми Cancel во время импорта
+>
+> // 4. Открыть log файл в редакторе — должны быть строки типа:
+> //    [2026-04-17T...] [INFO] [App] Sync All started, folders=2
+> //    [2026-04-17T...] [INFO] [App] Cancel clicked by user
+> //    [2026-04-17T...] [INFO] [Importer] Flush complete: imported=5 errors=0 cancelled=true
+>
+> // 5. Выключить
+> Logger.setEnabled(false)
+> ```
+
+- [ ] `Logger.isEnabled()` возвращает `false` после старта (off by default)
+- [ ] `Logger.setEnabled(true)` включает логирование
+- [ ] `Logger.getPath()` возвращает путь вида `.../sheepdog-debug.log` рядом с проектом
+- [ ] Sync All / Auto Sync toggle / Cancel → в log появляются записи
+- [ ] Формат: `[ISO-timestamp] [LEVEL] [component] message`
+- [ ] OFF: новые события не пишутся в файл (существующие строки остаются)
+- [ ] Rotate (ручной тест — опционально): создать фейковый log > 10MB → следующая запись триггерит rotate, создаются `.1`, `.2`, `.3`
+- [ ] Settings dialog с toggle "Debug mode" — отложено до §18
 
 ---
 
@@ -225,9 +298,14 @@
 
 ## 18. Settings dialog — PLANNED
 > Модалка с табами для управления глобальными настройками.
-> Табы: **General** (auto-save interval, UI density, **Show per-folder actions** toggle), **Filters** (extensions allowlist), **Ignored** (regex patterns), **About**.
+> Табы: **General** (Bridge timeout, Debug mode, Show per-folder actions), **Filters** (extensions allowlist), **Ignored** (regex patterns), **About**.
+>
+> **UI-level safety bounds** (отличаются от API-level sanity в Bridge/Logger):
+> - Bridge timeout: slider/input 5000-120000 ms (default 30000). Нельзя поставить <5s или >2min через UI.
+> - API (DevTools `Bridge.setDefaultTimeout(X)`) принимает 100-600000 ms — нужно для тестов/dev.
 - [ ] Кнопка-шестерёнка в header панели → открывается модалка
-- [ ] Таб General: toggle "Show per-folder actions" — управляет видимостью ↻ / gear icons в folder-row
+- [ ] Таб General: slider "Bridge timeout" (5-120s), toggle "Debug mode", toggle "Show per-folder actions"
+- [ ] Таб General: UI enforces 5000-120000 ms bound — ввод вне диапазона clamp'ится
 - [ ] Таб Filters: список расширений, add/remove, save
 - [ ] Таб Ignored: список regex/glob паттернов, add/remove, save
 - [ ] Изменения сохраняются в `sheepdog-settings.json`

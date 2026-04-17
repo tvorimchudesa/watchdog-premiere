@@ -2,6 +2,7 @@
  * SheepDog — Bridge module
  * Single entry point for all ExtendScript communication (DRY).
  * Wraps CSInterface.evalScript in Promises with JSON parsing.
+ * Every call supports per-call timeout + cancel token (defense in depth).
  */
 
 var Bridge = (function () {
@@ -9,13 +10,39 @@ var Bridge = (function () {
 
   var cs = new CSInterface();
 
+  var DEFAULT_TIMEOUT_MS = 30000;
+  var defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
+
+  /**
+   * Create a cancel token. Caller holds it, Bridge observes it.
+   * token.cancel() rejects the in-flight call immediately on JS side.
+   * ExtendScript keeps running — we just stop waiting for it.
+   */
+  function createCancelToken() {
+    var token = {
+      cancelled: false,
+      _handler: null,
+      cancel: function () {
+        if (token.cancelled) return;
+        token.cancelled = true;
+        if (typeof token._handler === "function") token._handler();
+      },
+    };
+    return token;
+  }
+
   /**
    * Call an ExtendScript function with JSON args.
-   * @param {string} fn - Function name in host.jsx
-   * @param {Object} [args] - Arguments (will be JSON-stringified)
-   * @returns {Promise<*>} Parsed result
+   * @param {string} fn
+   * @param {Object} [args]
+   * @param {{timeout?: number, cancelToken?: object}} [options]
+   * @returns {Promise<*>}
    */
-  function call(fn, args) {
+  function call(fn, args, options) {
+    options = options || {};
+    var timeoutMs = typeof options.timeout === "number" ? options.timeout : defaultTimeoutMs;
+    var cancelToken = options.cancelToken || null;
+
     return new Promise(function (resolve, reject) {
       var script;
       if (args !== undefined) {
@@ -25,7 +52,34 @@ var Bridge = (function () {
         script = fn + "()";
       }
 
+      var settled = false;
+
+      var timeoutId = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        reject(new Error("BRIDGE_TIMEOUT: " + fn + " did not respond within " + timeoutMs + "ms"));
+      }, timeoutMs);
+
+      if (cancelToken) {
+        if (cancelToken.cancelled) {
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(new Error("CANCELLED: " + fn + " cancelled by user"));
+          return;
+        }
+        cancelToken._handler = function () {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(new Error("CANCELLED: " + fn + " cancelled by user"));
+        };
+      }
+
       cs.evalScript(script, function (result) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+
         if (result === "EvalScript error." || result === "undefined") {
           reject(new Error("ExtendScript error in " + fn));
           return;
@@ -33,7 +87,6 @@ var Bridge = (function () {
         try {
           resolve(JSON.parse(result));
         } catch (e) {
-          // Not JSON — return raw string
           resolve(result);
         }
       });
@@ -44,96 +97,71 @@ var Bridge = (function () {
 
   return {
     /**
-     * Import files into a Premiere bin.
-     * @param {string[]} paths - Absolute file paths
-     * @param {string} binPath - Slash-separated bin path (e.g. "Footage/Day1")
-     * @returns {Promise<{success: boolean, imported: number, error?: string}>}
+     * Configure the default timeout (ms) for all Bridge calls.
+     * API-level sanity floor 100ms (prevents NaN / zero / negative).
+     * UI-level bounds (5000-120000) are enforced in the Settings dialog.
+     * @param {number} ms
      */
-    importFiles: function (paths, binPath) {
-      return call("importFilesToBin", { paths: paths, binPath: binPath });
+    setDefaultTimeout: function (ms) {
+      if (typeof ms !== "number" || !isFinite(ms)) return;
+      if (ms < 100) ms = 100;
+      if (ms > 600000) ms = 600000;
+      defaultTimeoutMs = ms;
     },
 
     /**
-     * Create a bin (folder) in the project.
-     * @param {string} name - Bin name
-     * @param {string} [parentPath] - Parent bin path
-     * @returns {Promise<{success: boolean, error?: string}>}
+     * Get current default timeout (ms).
+     * @returns {number}
      */
-    createBin: function (name, parentPath) {
-      return call("createBin", { name: name, parentPath: parentPath || "" });
+    getDefaultTimeout: function () {
+      return defaultTimeoutMs;
     },
 
     /**
-     * Get the current project file path.
-     * @returns {Promise<string>}
+     * Create a cancel token. Pass via options.cancelToken on any call.
+     * Call token.cancel() to abort the in-flight call.
+     * @returns {{cancelled: boolean, cancel: Function}}
      */
-    getProjectPath: function () {
-      return call("getProjectPath");
+    createCancelToken: createCancelToken,
+
+    importFiles: function (paths, binPath, options) {
+      return call("importFilesToBin", { paths: paths, binPath: binPath }, options);
     },
 
-    /**
-     * Get root bin name.
-     * @returns {Promise<string>}
-     */
-    getRootBinName: function () {
-      return call("getRootBinName");
+    createBin: function (name, parentPath, options) {
+      return call("createBin", { name: name, parentPath: parentPath || "" }, options);
     },
 
-    /**
-     * Remove a file from a Premiere bin (Mirror Deletions).
-     * @param {string} filePath - Absolute file path
-     * @param {string} binPath - Target bin path
-     * @returns {Promise<{success: boolean, error?: string}>}
-     */
-    removeFile: function (filePath, binPath) {
-      return call("removeFileFromBin", { filePath: filePath, binPath: binPath });
+    getProjectPath: function (options) {
+      return call("getProjectPath", undefined, options);
     },
 
-    /**
-     * Filter out files already imported in the project (dedupe by mediaPath).
-     * @param {string[]} paths - Absolute file paths to check
-     * @returns {Promise<{newPaths: string[]}>}
-     */
-    dedupeFiles: function (paths) {
-      return call("dedupeFiles", { paths: paths });
+    getRootBinName: function (options) {
+      return call("getRootBinName", undefined, options);
     },
 
-    /**
-     * Flatten a bin: move all sub-bin files into root bin, remove empty sub-bins.
-     * Timeline references preserved (moveBin, not re-import).
-     * @param {string} binPath - Target bin path
-     * @returns {Promise<{success: boolean, moved: number, error?: string}>}
-     */
-    flattenBin: function (binPath) {
-      return call("flattenBin", { binPath: binPath });
+    removeFile: function (filePath, binPath, options) {
+      return call("removeFileFromBin", { filePath: filePath, binPath: binPath }, options);
     },
 
-    /**
-     * Unflatten a bin: move files back into sub-bins based on disk path.
-     * Timeline references preserved (moveBin, not re-import).
-     * @param {string} binPath - Target bin path
-     * @param {string} watchFolderPath - Absolute path to watch folder on disk
-     * @returns {Promise<{success: boolean, moved: number, error?: string}>}
-     */
-    unflattenBin: function (binPath, watchFolderPath) {
-      return call("unflattenBin", { binPath: binPath, watchFolderPath: watchFolderPath });
+    dedupeFiles: function (paths, options) {
+      return call("dedupeFiles", { paths: paths }, options);
     },
 
-    /**
-     * Health check.
-     * @returns {Promise<string>} "ok" if connected
-     */
-    ping: function () {
-      return call("ping");
+    flattenBin: function (binPath, options) {
+      return call("flattenBin", { binPath: binPath }, options);
     },
 
-    /**
-     * Environment self-check. Returns parsed diagnose() result.
-     * Use at panel startup to detect broken ExtendScript state.
-     * @returns {Promise<{jsonOk, appOk, projectOk, rootItemOk, binApiOk, importApiOk, ok}>}
-     */
-    diagnose: function () {
-      return call("diagnose").then(function (raw) {
+    unflattenBin: function (binPath, watchFolderPath, options) {
+      return call("unflattenBin", { binPath: binPath, watchFolderPath: watchFolderPath }, options);
+    },
+
+    ping: function (options) {
+      return call("ping", undefined, options);
+    },
+
+    diagnose: function (options) {
+      return call("diagnose", undefined, options).then(function (raw) {
         var out = { ok: true };
         var parts = String(raw).split(";");
         for (var i = 0; i < parts.length; i++) {

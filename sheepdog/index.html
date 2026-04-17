@@ -41,7 +41,10 @@
       <div class="progress-bar">
         <div id="progress-fill" class="progress-fill"></div>
       </div>
-      <p id="progress-text" class="muted">Importing...</p>
+      <div class="progress-row">
+        <p id="progress-text" class="muted">Importing...</p>
+        <button id="btn-cancel" class="btn btn-cancel" title="Stop the current import">Cancel</button>
+      </div>
     </section>
 
     <footer>
@@ -51,6 +54,7 @@
 
   <script src="js/lib/CSInterface.js"></script>
   <script src="js/bridge.js"></script>
+  <script src="js/modules/logger.js"></script>
   <script src="js/modules/settings-manager.js"></script>
   <script src="js/modules/folder-manager.js"></script>
   <script src="js/modules/importer.js"></script>

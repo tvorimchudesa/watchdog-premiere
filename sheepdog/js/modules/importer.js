@@ -2,6 +2,7 @@
  * SheepDog — Importer module
  * Responsibility: Filter by extension + batch import via Bridge (SRP)
  * Defense in Depth: Extension filter here AND in Watcher.
+ * Batch chunking + cancel token + stall hint (§14.5).
  */
 
 var Importer = (function () {
@@ -9,7 +10,6 @@ var Importer = (function () {
 
   var path = require("path");
 
-  // Default allowed extensions
   var DEFAULT_EXTENSIONS = [
     ".mp4", ".mov", ".mxf", ".avi", ".mkv", ".wmv", ".m4v",
     ".wav", ".mp3", ".aif", ".aiff", ".m4a", ".flac",
@@ -17,27 +17,33 @@ var Importer = (function () {
     ".psd", ".ai", ".exr", ".dpx", ".tga",
   ];
 
-  // Queue: { filePath, binPath }
-  var queue = [];
+  var DEFAULT_CHUNK_SIZE = 10;
+  var DEFAULT_STALL_MS = 10000;
 
-  // Allowed extensions (will be set from SettingsManager)
+  var queue = [];
   var allowedExtensions = DEFAULT_EXTENSIONS.slice();
 
-  // Callbacks
   var progressCallback = null;
   var completeCallback = null;
+  var stallCallback = null;
 
-  // Import state
   var importing = false;
+  var currentCancelToken = null;
 
-  /**
-   * Check if a file extension is allowed.
-   * @param {string} filePath
-   * @returns {boolean}
-   */
+  var chunkSize = DEFAULT_CHUNK_SIZE;
+  var stallMs = DEFAULT_STALL_MS;
+
   function isAllowed(filePath) {
     var ext = path.extname(filePath).toLowerCase();
     return allowedExtensions.indexOf(ext) !== -1;
+  }
+
+  function chunk(arr, size) {
+    var out = [];
+    for (var i = 0; i < arr.length; i += size) {
+      out.push(arr.slice(i, i + size));
+    }
+    return out;
   }
 
   // --- Public API ---
@@ -45,35 +51,30 @@ var Importer = (function () {
   return {
     DEFAULT_EXTENSIONS: DEFAULT_EXTENSIONS,
 
-    /**
-     * Set allowed extensions list.
-     * @param {string[]} extensions - e.g. [".mp4", ".mov"]
-     */
     setAllowedExtensions: function (extensions) {
       allowedExtensions = extensions.map(function (e) {
         return e.toLowerCase();
       });
     },
 
-    /**
-     * Check if a file passes the extension filter.
-     * Exposed for Watcher to do early rejection (Defense in Depth).
-     * @param {string} filePath
-     * @returns {boolean}
-     */
+    setChunkSize: function (n) {
+      if (typeof n !== "number" || !isFinite(n)) return;
+      if (n < 1) n = 1;
+      if (n > 100) n = 100;
+      chunkSize = n;
+    },
+
+    setStallMs: function (ms) {
+      if (typeof ms !== "number" || !isFinite(ms)) return;
+      if (ms < 1000) ms = 1000;
+      stallMs = ms;
+    },
+
     isAllowed: isAllowed,
 
-    /**
-     * Add a file to the import queue.
-     * @param {string} filePath - Absolute file path
-     * @param {Object} folderConfig - { targetBin, ... }
-     */
     enqueue: function (filePath, folderConfig) {
-      // Defense in Depth: filter again here
       if (!isAllowed(filePath)) return;
 
-      // Compute bin path: targetBin + relative subfolder path
-      // Flatten mode: all files go to root targetBin regardless of subfolder
       var binPath = folderConfig.targetBin;
       if (folderConfig.subfolders && !folderConfig.flatten) {
         var fileDir = path.dirname(filePath);
@@ -83,102 +84,146 @@ var Importer = (function () {
         }
       }
 
-      queue.push({
-        filePath: filePath,
-        binPath: binPath,
-      });
+      queue.push({ filePath: filePath, binPath: binPath });
     },
 
     /**
-     * Import all queued files in batches, grouped by target bin.
-     * @returns {Promise<{imported: number, errors: number}>}
+     * Flush queue in chunks, grouped by target bin.
+     * Progress fires per chunk completion. Cancellable via Importer.cancel().
+     * @returns {Promise<{imported: number, errors: number, cancelled: boolean}>}
      */
     flush: function () {
       if (importing || queue.length === 0) {
-        return Promise.resolve({ imported: 0, errors: 0 });
+        return Promise.resolve({ imported: 0, errors: 0, cancelled: false });
       }
 
       importing = true;
-      var items = queue.splice(0); // Take all and clear queue
+      currentCancelToken = Bridge.createCancelToken();
+      var token = currentCancelToken;
+
+      var items = queue.splice(0);
       var total = items.length;
       var imported = 0;
       var errors = 0;
 
-      // Group by binPath for batch import
       var groups = {};
       items.forEach(function (item) {
         if (!groups[item.binPath]) groups[item.binPath] = [];
         groups[item.binPath].push(item.filePath);
       });
 
-      var binPaths = Object.keys(groups);
-      var index = 0;
+      var tasks = [];
+      Object.keys(groups).forEach(function (bin) {
+        chunk(groups[bin], chunkSize).forEach(function (batch) {
+          tasks.push({ bin: bin, paths: batch });
+        });
+      });
 
-      function importNext() {
-        if (index >= binPaths.length) {
-          importing = false;
-          if (completeCallback) completeCallback({ imported: imported, errors: errors });
-          return Promise.resolve({ imported: imported, errors: errors });
-        }
+      var totalChunks = tasks.length;
+      var chunkIndex = 0;
 
-        var bin = binPaths[index];
-        var paths = groups[bin];
-        index++;
+      function finish(cancelled) {
+        importing = false;
+        currentCancelToken = null;
+        var result = { imported: imported, errors: errors, cancelled: !!cancelled };
+        if (completeCallback) completeCallback(result);
+        return result;
+      }
 
-        // Dedupe is built into importFilesToBin (ExtendScript side)
-        return Bridge.importFiles(paths, bin)
+      function runNext() {
+        if (token.cancelled) return finish(true);
+        if (chunkIndex >= tasks.length) return finish(false);
+
+        var task = tasks[chunkIndex];
+        chunkIndex++;
+
+        var stallFired = false;
+        var stallTimer = setTimeout(function () {
+          stallFired = true;
+          if (stallCallback) {
+            stallCallback({
+              chunkIndex: chunkIndex,
+              chunkTotal: totalChunks,
+              stuckMs: stallMs,
+            });
+          }
+        }, stallMs);
+
+        return Bridge.importFiles(task.paths, task.bin, { cancelToken: token })
           .then(function (result) {
-            if (result.success) {
-              imported += result.imported;
+            clearTimeout(stallTimer);
+            if (result && result.success) {
+              imported += result.imported || 0;
+              errors += task.paths.length - (result.imported || 0);
             } else {
-              errors += paths.length;
-              console.error("[Importer] Failed to import to bin " + bin + ":", result.error);
+              errors += task.paths.length;
+              console.error("[Importer] Chunk failed for bin " + task.bin + ":",
+                result && result.error);
             }
-
             if (progressCallback) {
-              progressCallback({ done: imported + errors, total: total });
+              progressCallback({
+                done: imported + errors,
+                total: total,
+                chunkIndex: chunkIndex,
+                chunkTotal: totalChunks,
+                stalled: stallFired,
+              });
             }
-
-            return importNext();
+            return runNext();
           })
           .catch(function (err) {
-            errors += paths.length;
-            console.error("[Importer] Bridge error:", err.message);
-
-            if (progressCallback) {
-              progressCallback({ done: imported + errors, total: total });
+            clearTimeout(stallTimer);
+            var msg = err && err.message ? err.message : String(err);
+            if (msg.indexOf("CANCELLED") === 0) {
+              return finish(true);
             }
-
-            return importNext();
+            errors += task.paths.length;
+            console.error("[Importer] Bridge error:", msg);
+            if (progressCallback) {
+              progressCallback({
+                done: imported + errors,
+                total: total,
+                chunkIndex: chunkIndex,
+                chunkTotal: totalChunks,
+                stalled: stallFired,
+                error: msg,
+              });
+            }
+            return runNext();
           });
       }
 
-      if (progressCallback) progressCallback({ done: 0, total: total });
-      return importNext();
+      if (progressCallback) {
+        progressCallback({
+          done: 0,
+          total: total,
+          chunkIndex: 0,
+          chunkTotal: totalChunks,
+          stalled: false,
+        });
+      }
+      return runNext();
     },
 
     /**
-     * Get current queue length.
-     * @returns {number}
+     * Cancel an in-progress flush. Safe to call anytime.
+     * Current Bridge call rejects with CANCELLED; remaining chunks skipped.
      */
+    cancel: function () {
+      if (currentCancelToken) currentCancelToken.cancel();
+      queue.length = 0;
+    },
+
+    isImporting: function () {
+      return importing;
+    },
+
     queueLength: function () {
       return queue.length;
     },
 
-    /**
-     * Register progress callback.
-     * @param {Function} cb - callback({done: number, total: number})
-     */
-    onProgress: function (cb) {
-      progressCallback = cb;
-    },
-
-    /**
-     * Register completion callback.
-     * @param {Function} cb - callback({imported: number, errors: number})
-     */
-    onComplete: function (cb) {
-      completeCallback = cb;
-    },
+    onProgress: function (cb) { progressCallback = cb; },
+    onComplete: function (cb) { completeCallback = cb; },
+    onStall: function (cb) { stallCallback = cb; },
   };
 })();

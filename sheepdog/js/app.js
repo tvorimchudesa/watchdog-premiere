@@ -19,6 +19,7 @@
   var progressSection = document.getElementById("progress-section");
   var progressFill = document.getElementById("progress-fill");
   var progressText = document.getElementById("progress-text");
+  var btnCancel = document.getElementById("btn-cancel");
   var statusEl = document.getElementById("status");
 
   // --- Project directory (derived from .prproj path) ---
@@ -179,6 +180,7 @@
       return;
     }
 
+    Logger.info("App", "Sync All started, folders=" + folders.length);
     setStatus("Scanning folders...");
     Watcher.clearSeen();
 
@@ -187,6 +189,7 @@
     });
 
     var queueLen = Importer.queueLength();
+    Logger.info("App", "Sync All scan done, queued=" + queueLen);
     if (queueLen === 0) {
       setStatus("All synced — no new files");
       return;
@@ -202,9 +205,12 @@
    */
   function syncFolder(folder) {
     if (!folder || !folder.enabled) return;
+    Logger.info("App", "Sync folder started: " + folder.path);
     setStatus("Scanning " + (path ? path.basename(folder.path) : folder.path) + "...");
     scanFolder(folder.path, folder, folder.subfolders);
-    if (Importer.queueLength() === 0) {
+    var queued = Importer.queueLength();
+    Logger.info("App", "Sync folder scan done, queued=" + queued);
+    if (queued === 0) {
       setStatus("All synced — no new files");
       return;
     }
@@ -241,8 +247,22 @@
     showProgress(progress.done, progress.total);
   });
 
+  Importer.onStall(function (info) {
+    progressText.textContent = "Importing... this batch is slow (chunk " +
+      info.chunkIndex + "/" + info.chunkTotal + ")";
+    Logger.warn("Importer", "Chunk stalled " + info.chunkIndex + "/" +
+      info.chunkTotal + " after " + info.stuckMs + "ms");
+  });
+
   Importer.onComplete(function (result) {
     hideProgress();
+    Logger.info("Importer", "Flush complete: imported=" + result.imported +
+      " errors=" + result.errors + " cancelled=" + result.cancelled);
+    if (result.cancelled) {
+      setStatus("Cancelled \u2014 " + result.imported + " of " +
+        (result.imported + result.errors) + " imported");
+      return;
+    }
     if (result.imported === 0 && result.errors === 0) {
       setStatus("All synced \u2014 no new files");
     } else {
@@ -278,9 +298,11 @@
     Bridge.removeFile(event.filePath, binPath).then(function (result) {
       if (result.success) {
         setStatus("Mirrored deletion: " + path.basename(event.filePath));
+        Logger.info("App", "Mirror deletion: " + event.filePath + " -> bin " + binPath);
       }
     }).catch(function (err) {
       console.error("[App] Mirror deletion failed:", err.message);
+      Logger.error("App", "Mirror deletion failed for " + event.filePath + ": " + err.message);
     });
   });
 
@@ -308,6 +330,7 @@
           if (!env.importApiOk) broken.push("importFiles");
           setStatus("ExtendScript broken: " + broken.join(", "));
           console.error("[SheepDog] diagnose failed:", env);
+          Logger.error("App", "Diagnose failed: " + broken.join(", "));
           renderFolders();
           throw new Error("diagnose_failed");
         }
@@ -318,15 +341,20 @@
           projectDir = path.dirname(projPath);
           SettingsManager.init(projectDir);
           FolderManager.init(projectDir);
+          Logger.init(projectDir);
+          Logger.setEnabled(SettingsManager.get("debugMode"));
 
-          // Apply settings
+          Bridge.setDefaultTimeout(SettingsManager.get("bridgeTimeoutMs"));
           Importer.setAllowedExtensions(SettingsManager.get("allowedExtensions"));
           toggleAuto.checked = SettingsManager.get("autoSync");
           toggleMirror.checked = SettingsManager.get("mirrorDeletions");
 
-          // Start watchers if autoSync was on
+          Logger.info("App", "Panel started, projectDir=" + projectDir);
+
           if (SettingsManager.get("autoSync")) {
             Watcher.start(FolderManager.getEnabled());
+            Logger.info("App", "Auto Sync restored from settings, watching " +
+              FolderManager.getEnabled().length + " folders");
           }
         }
 
@@ -348,15 +376,18 @@
     syncAll();
   });
 
+  btnCancel.addEventListener("click", function () {
+    Logger.info("App", "Cancel clicked by user");
+    Importer.cancel();
+  });
+
   toggleAuto.addEventListener("change", function () {
     var isOn = toggleAuto.checked;
     SettingsManager.set("autoSync", isOn);
+    Logger.info("App", "Auto Sync toggled " + (isOn ? "ON" : "OFF"));
 
     if (isOn) {
       Watcher.start(FolderManager.getEnabled());
-      // Auto Sync ON means "make the project match the folders" — scan existing
-      // content, not just watch for future events. Otherwise user adds 500 files,
-      // toggles Auto Sync, sees nothing happen and assumes the tool is broken.
       syncAll();
     } else {
       Watcher.stop();
