@@ -149,6 +149,44 @@
 
 ---
 
+# v1.1 Infrastructure — PLANNED
+
+## 14.5. Defensive infrastructure: Bridge timeout + Cancel + Debug log
+> **Приоритет:** ДО фич v1.1. Без этого BUG-001 продолжит убивать сессии без диагностики.
+> Three-in-one: разблокировать зависшие Promise, дать юзеру exit, собрать данные для repro.
+
+### 14.5.1. Bridge timeout
+> Каждый `Bridge.call(fn, args)` должен иметь timeout (default 60s).
+> Если callback не вернулся — reject с маркированной ошибкой "BRIDGE_TIMEOUT".
+- [ ] `Bridge.call` обёрнут в `Promise.race([callPromise, timeoutPromise])`
+- [ ] Timeout 60s default, конфигурится через settings
+- [ ] Error message: `"BRIDGE_TIMEOUT: <fnName> did not respond within 60s"`
+- [ ] Тест: искусственно замедлить ExtendScript (`$.sleep(65000)`) → panel получает timeout error, не висит
+- [ ] После timeout: UI разблокирован, статус показывает ошибку, дальнейшие операции работают
+
+### 14.5.2. Cancel button во время импорта
+> Во время активного Sync All / Manual Sync — кнопка Cancel.
+> Клик → `Importer.cancel()` → queue очищается, pending Promise reject'ится с "CANCELLED".
+- [ ] Во время импорта Sync All / Manual заменяется на Cancel button
+- [ ] Клик Cancel → импорт прерывается, статус "Cancelled by user — N of M imported"
+- [ ] После Cancel: state чистый, можно запускать новый импорт
+- [ ] Auto Sync tick тоже cancellable (хотя обычно быстрый)
+
+### 14.5.3. Debug mode + log file
+> Event trace в `sheepdog-debug.log` рядом с проектом. Off by default.
+> Log format: `[ISO-timestamp] [level] [component] message`
+> Level: INFO / WARN / ERROR
+> Append-only, rotate при > 10 MB (keep last 3 files).
+- [ ] Toggle "Debug mode" в Settings → General
+- [ ] OFF default: ничего не пишется (быстро, privacy)
+- [ ] ON: log высокоуровневых событий — Sync started/finished, Import batch progress, Bridge call/return, Errors
+- [ ] НЕ логируем: архитектурные internals (dedupe algorithm details, sequence patterns) — только event trace
+- [ ] Максимум 10 MB, после — rotate (`.1`, `.2`, `.3` suffixes)
+- [ ] Кнопка "Open log folder" в Settings → About
+- [ ] Юзер может послать log файл в bug report
+
+---
+
 # v1.1 Features — PLANNED
 
 ## 15. Ignored folders (regex/glob) — PLANNED
@@ -243,17 +281,40 @@
 
 # KNOWN BUGS — TO INVESTIGATE
 
-## BUG-001: Sync All crash requires Premiere restart
-> Обнаружен 2026-04-17. Repro не найден.
-> **Симптом:** после некоторого действия Sync All перестаёт работать / панель зависает / import silently fails.
-> **Triggers (что помнится):** связан с Sync All, возможно после специфичной последовательности.
-> **Workaround:** полный перезапуск Premiere Pro (не просто reload панели).
+## BUG-001: Manual/Sync All stuck on "0 of N" — import Promise hangs
+> Обнаружен 2026-04-17. Repro не найден, но симптомы детальны.
+> **Симптом:**
+> - Запустил Manual Sync → статус "Imported 0 of N" (или Sync All)
+> - Прогресс НЕ двигается, зависает на 0
+> - Панель в остальном отзывчива: можно добавлять новые папки, их статус выводится корректно
+> - Снос bin в Premiere — не помогает
+> - Снос watch folder из плагина — не помогает
+> - Перезапуск панели (close/open в Window → Extensions) — не помогает
+> - **Только полный перезапуск Premiere Pro** восстанавливает работу
+>
+> **Гипотеза root cause:** `Importer.flush()` висит на `Bridge.importFiles()` — Promise никогда не resolve/reject.
+> Возможные причины:
+> 1. ExtendScript `app.project.importFiles(...)` кинул исключение, которое потерялось
+> 2. Premiere показывает модалку где-то не видно и ждёт user interaction
+> 3. CEF callback от `cs.evalScript(...)` никогда не выстрелил
+> 4. Queue state не сбрасывается даже при новых операциях → deadlock
+>
+> **Triggers (догадки):**
+> - Большое кол-во файлов в одном batch?
+> - Специфичное расширение?
+> - Offline items в bin до Sync All?
+> - Flat mode ON?
+> - Определённая последовательность действий (например drag-drop → Manual → Sync All)?
+>
+> **Workaround:** полный restart Premiere Pro.
+> **Fix-direction:** §14.5 (timeout + Cancel + debug log) сделает баг видимым и unstick'ает UI.
+>
 > **TODO:**
-> - [ ] Воспроизвести. Возможные факторы: большое кол-во файлов, offline items в bin, Flat mode ON, специфичные расширения
-> - [ ] Логировать последние N операций в `sheepdog-debug.log` для post-mortem
-> - [ ] Проверить: есть ли exception в DevTools console в момент бага
-> - [ ] Проверить: есть ли ошибка в ExtendScript (Bridge.diagnose перед Sync All)
-> - [ ] Если repro найден — баг чинится и этот пункт закрывается
+> - [ ] Собрать repro: попробовать trigger-факторы в изоляции (много файлов / spec extension / post drag-drop / Flat ON)
+> - [ ] После §14.5: включить debug mode → ждать следующего появления → собрать log
+> - [ ] Проверить в DevTools console когда случится: есть ли uncaught exception в момент hang
+> - [ ] Проверить Bridge.diagnose() перед Sync All: все ли компоненты ok
+> - [ ] Если repro найден → fix → закрыть баг
 
 ---
 
