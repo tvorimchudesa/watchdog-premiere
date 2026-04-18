@@ -307,6 +307,8 @@
 # v1.1 Features — PLANNED
 
 ## 15. Ignored folders (regex/glob) — PLANNED
+
+<!-- Есть ощущение, если мы дадим юзеру возможность добавлять прокси папки, то надо делать секцию с драг ин дропом и адд, как негатив версию основной сеции плагина, но она будет показываться только в настройках -->
 > Игнорировать системный мусор и прокси-папки при сканировании.
 > Defaults: `.DS_Store`, `Thumbs.db`, `**/proxy/**`, `**/.*` (скрытые), `**/Adobe Premiere Pro Auto-Save/**`.
 > Пользователь может добавлять свои паттерны через Settings.
@@ -318,6 +320,8 @@
 - [ ] Статус: "Skipped N ignored files" при Sync All
 
 ## 16. Image sequence support — PLANNED
+
+<!-- Должен быть точно перфолдер -->
 > Серии EXR/DPX/TIF/PNG (`name.NNNN.ext`) импортируются как **один клип**, не как N стиллов.
 > Критично для VFX/DI/motion workflow — без этого инструмент непригоден для renders.
 > Реализация: детектор паттернов в importer, вызов `importFiles([firstFrame], true, binPath, true)` — `asNumberedStills=true`.
@@ -355,6 +359,41 @@
 - [ ] Изменения сохраняются в `sheepdog-settings.json`
 - [ ] Закрытие без save → изменения отменяются
 - [ ] Reset to defaults → стандартные значения возвращаются
+
+## 18.5. Per-folder controls strip (AE-style, collapsible) — PLANNED
+> **UX-контейнер** для всех per-folder действий (§19 Manual Sync, §20 Danger Zone, §17 Color label, будущие toggles типа Subfolders/Flatten-override).
+> Метафора — AE layer panel: маленький ряд icon-toggles справа от имени слоя/папки. Плотно, без лейблов, hover даёт tooltip.
+>
+> **Сейчас:** §19 кладёт одну ↻, §20 кладёт ⚙ с inline-expand — каждое решение само по себе, без общего контейнера. Когда добавим §17 (color), §16 (subfolder override), toggle'ы разъедят folder-row.
+>
+> **Решение:** единый collapsible strip per folder. По умолчанию свёрнут — видна только стрелка `<` / `>`. Клик → раскрывается ряд AE-style значков.
+
+### 18.5.1. Visual
+- [ ] Свёрнутое состояние (default): `[toggle] path → bin  [×]  [<]` — чистая строка
+- [ ] Развёрнутое: `[toggle] path → bin  [↻] [⚙] [🎨] [📁]  [×]  [>]` — ряд AE-значков между bin и ×
+- [ ] Стрелка `<` → `>` (rotate или swap glyph) маркирует состояние
+- [ ] Значки: 12-14px, плотно (gap 2-3px), без лейблов. Tooltip на hover объясняет действие
+- [ ] Стиль — как AE/Premiere column icons: квадратный hit-area, активные подсвечены accent цветом, inactive — text-muted
+
+### 18.5.2. Поведение
+- [ ] Состояние (expanded/collapsed) per folder — хранится в памяти сессии, не persists на диск (ephemeral UX)
+- [ ] При добавлении новой папки — collapsed
+- [ ] Global toggle "Show per-folder actions" в Settings (§18) — master switch: OFF → стрелка скрыта совсем, старое поведение. ON → стрелка доступна у каждой папки
+- [ ] Несколько папок могут быть expanded одновременно (не accordion)
+
+### 18.5.3. Что входит в strip (по мере реализации)
+- [ ] ↻ Manual Sync (§19) — sync этой папки
+- [ ] ⚙ Danger Zone (§20) — раскрывает sub-panel с destructive actions (gear-inside-strip вместо отдельной gear-row)
+- [ ] 🎨 Color label (§17) — picker этой папки
+- [ ] 📁 Subfolders on/off per folder — override глобального
+- [ ] Flat override per folder — если решим делать per-folder (сейчас глобально в §12)
+
+### 18.5.4. Anti-patterns (явно не делаем)
+- [ ] Не выводим все significant icons всегда — это засорит folder-row при 10+ папках
+- [ ] Не делаем accordion (открытие одной закрывает другую) — юзер может сравнивать настройки двух папок рядом
+- [ ] Не persists expanded-state на диск — лишний state для косметики, не стоит
+
+---
 
 ## 19. Manual Sync per folder — PLANNED
 > Иконка ↻ в каждой folder-row — синк только этой папки (scope-limited аналог Sync All).
