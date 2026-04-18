@@ -377,6 +377,30 @@
     });
   }
 
+  // --- Dump triggers (§23 Dev Observability) ---
+  //
+  // Ring buffer in Logger captures events continuously. These triggers dump
+  // it to disk on terminal/interesting events so we can reconstruct timelines
+  // post-mortem (e.g. BUG-001 soft-lock). Each trigger lands in
+  // {projectDir}/sheepdog-logs/{reason}-{timestamp}.log.
+
+  window.addEventListener("error", function (ev) {
+    var msg = ev && ev.message ? ev.message : "unknown error";
+    Logger.error("App", "Uncaught: " + msg);
+    Logger.dump("crash", msg);
+  });
+
+  window.addEventListener("unhandledrejection", function (ev) {
+    var reason = ev && ev.reason ? (ev.reason.message || String(ev.reason)) : "unknown";
+    Logger.error("App", "Unhandled rejection: " + reason);
+    Logger.dump("crash", reason);
+  });
+
+  window.addEventListener("beforeunload", function () {
+    Logger.info("App", "Panel closing");
+    Logger.dump("session");
+  });
+
   // --- UI Event handlers ---
   btnSync.addEventListener("click", function () {
     syncAll();
@@ -384,6 +408,7 @@
 
   btnCancel.addEventListener("click", function () {
     Logger.info("App", "Cancel clicked by user");
+    Logger.dump("cancel");
     Importer.cancel();
   });
 

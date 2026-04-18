@@ -8,3 +8,6 @@ docs/watchtowerAboutVideo/*.mp4
 .env
 sheepdog-folders.json
 sheepdog-settings.json
+sheepdog-debug.log
+sheepdog-debug.log.*
+sheepdog-logs/

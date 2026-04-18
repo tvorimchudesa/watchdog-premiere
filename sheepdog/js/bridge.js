@@ -57,7 +57,12 @@ var Bridge = (function () {
       var timeoutId = setTimeout(function () {
         if (settled) return;
         settled = true;
-        reject(new Error("BRIDGE_TIMEOUT: " + fn + " did not respond within " + timeoutMs + "ms"));
+        var msg = "BRIDGE_TIMEOUT: " + fn + " did not respond within " + timeoutMs + "ms";
+        if (typeof Logger !== "undefined" && Logger.dump) {
+          Logger.warn("Bridge", msg);
+          Logger.dump("timeout", msg);
+        }
+        reject(new Error(msg));
       }, timeoutMs);
 
       if (cancelToken) {
