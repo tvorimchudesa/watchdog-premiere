@@ -257,18 +257,25 @@
   Importer.onComplete(function (result) {
     hideProgress();
     Logger.info("Importer", "Flush complete: imported=" + result.imported +
-      " errors=" + result.errors + " cancelled=" + result.cancelled);
+      " skipped=" + result.skipped + " errors=" + result.errors +
+      " cancelled=" + result.cancelled);
     if (result.cancelled) {
-      setStatus("Cancelled \u2014 " + result.imported + " of " +
-        (result.imported + result.errors) + " imported");
+      var total = result.imported + result.skipped + result.errors;
+      setStatus("Cancelled \u2014 " + result.imported + " of " + total + " imported");
       return;
     }
-    if (result.imported === 0 && result.errors === 0) {
+    if (result.imported === 0 && result.errors === 0 && result.skipped === 0) {
       setStatus("All synced \u2014 no new files");
-    } else {
-      setStatus("Imported " + result.imported + " file" + (result.imported !== 1 ? "s" : "") +
-        (result.errors > 0 ? " (" + result.errors + " failed)" : ""));
+      return;
     }
+    if (result.imported === 0 && result.errors === 0 && result.skipped > 0) {
+      setStatus("All synced \u2014 " + result.skipped + " already in project");
+      return;
+    }
+    var msg = "Imported " + result.imported + " file" + (result.imported !== 1 ? "s" : "");
+    if (result.skipped > 0) msg += " (" + result.skipped + " already in project)";
+    if (result.errors > 0) msg += " (" + result.errors + " failed)";
+    setStatus(msg);
   });
 
   // --- Wire up Watcher → Importer ---

@@ -165,24 +165,28 @@
 > // 1. Проверить default
 > Bridge.getDefaultTimeout()                 // → 30000
 >
-> // 2. Искусственно замедлить timeout для теста
-> Bridge.setDefaultTimeout(2000)             // 2 секунды
+> // 2. Поставить минимум — 100ms (clamp floor в bridge.js). Гарантированно
+> //    триггерится на любом Bridge.importFiles round-trip.
+> Bridge.setDefaultTimeout(100)
 >
-> // 3. Запустить Sync All на папке с несколькими .mp4 файлами
-> //    → через ~2s статус: "Imported 0 file (N failed)" или ошибка в console
-> //    → панель разблокирована, можно добавлять папки
+> // 3. Sync All на любой папке с медиа
+> //    → в console: "BRIDGE_TIMEOUT: importFilesToBin did not respond within 100ms"
+> //    → UI разблокируется, Cancel исчезает
 >
-> // 4. Вернуть нормальное значение
+> // 4. Восстановить
 > Bridge.setDefaultTimeout(30000)
->
-> // 5. Sync All работает как обычно
 > ```
+>
+> **Почему не 2000ms:** chunk из 10 файлов у Premiere летит за <2s, timeout не
+> успевает стрельнуть. 100ms (floor) — надёжно.
 
-- [ ] `Bridge.getDefaultTimeout()` возвращает `30000` после старта
-- [ ] `Bridge.setDefaultTimeout(2000)` + Sync All → timeout срабатывает, импорт не висит
-- [ ] Error виден в DevTools console: `"BRIDGE_TIMEOUT: importFilesToBin did not respond within 2000ms"`
-- [ ] После timeout UI разблокирован, Cancel button исчезает, можно запустить новый Sync All
-- [ ] `setDefaultTimeout(30000)` восстанавливает default, нормальный импорт работает
+- [Да] `Bridge.getDefaultTimeout()` возвращает `30000` после старта
+- [Да] `Bridge.setDefaultTimeout(100)` + Sync All → timeout срабатывает, импорт не висит
+- [Да] Error виден в DevTools console: `"BRIDGE_TIMEOUT: importFilesToBin did not respond within 100ms"`  <!-- Но фактически файлы в проект импортнулись, но я так понимаю это ок -->
+- [Да] После timeout UI разблокирован, Cancel button исчезает, можно запустить новый Sync All
+- [Да] `setDefaultTimeout(30000)` восстанавливает default, нормальный импорт работает 
+
+<!-- И еще момент, мы сейчас показываем прогресс батчами. Но юзеру похуй вообще на то что мы батчами отслеживаем x + 10 of N, ему важен прогресс именно of N, потому предлагаю юзеру выводить прогресс глобального одного бара -->
 
 ### 14.5.2. Cancel button visible from t=0
 > Cancel доступна **с секунды 0** импорта — юзер сам решает когда stop.
@@ -355,6 +359,36 @@
 - [ ] Статус обновляется: при Manual Sync / Sync All / Auto Sync tick
 - [ ] Файлы которые юзер релинкнул вне watch folders → "outside watched folders" (не удалять, не тянуть)
 
+## 22. Progress bar improvements — PLANNED
+> Текущий progress bar показывает только "Importing X/Y..." и % fill.
+> При chunked-импорте (§14.5.3) и dedupe-heavy папках этого мало — юзер не
+> видит что происходит: сколько chunks осталось, сколько уже в проекте, почему
+> "застыло". Прогресс = коммуникация, не декорация.
+>
+> Implementation hooks уже есть: `progressCallback` получает
+> `{done, total, chunkIndex, chunkTotal, stalled}`, `stallCallback` — `{chunkIndex, chunkTotal, stuckMs}`.
+> Большинство пунктов — работа в `showProgress()` в [app.js](sheepdog/js/app.js#L34-L39).
+
+### 22.1. Live-информация во время импорта
+- [ ] Chunk-счётчик в статусе: `"Importing 45/152 (chunk 5/16)"` — юзер видит что batch-прогресс жив
+- [ ] Live skipped count: `"Importing 45/152 (12 already in project)"` — не ждём финала чтобы увидеть что dedupe работает
+- [ ] Live errors count если > 0: `"Importing 45/152 (3 failed)"` — ранняя видимость проблем
+
+### 22.2. Stall-состояние визуально
+- [ ] При `onStall` progress bar меняет цвет (оранжевый/жёлтый) — не только текст
+- [ ] Pulse/shimmer анимация во время stall → сразу ясно что "ещё крутится, но долго"
+- [ ] После завершения chunk возвращается к обычному цвету
+
+### 22.3. ETA (optional, после 2-3 chunks)
+- [ ] Rolling average времени per chunk → "~12s remaining" в статусе
+- [ ] Не показывать ETA для коротких импортов (< 3 chunks) — враньё на малых n
+- [ ] Сбрасывается при stall (чтобы не показывать неактуальный ETA)
+
+### 22.4. Final state polish
+- [ ] `hideProgress()` с задержкой 1-2s после complete — юзер успевает прочитать финальный статус
+- [ ] Fade-out анимация вместо резкого `display:none`
+- [ ] Cancel button исчезает синхронно с progress bar (а не отдельно)
+
 ---
 
 # KNOWN BUGS — TO INVESTIGATE
@@ -408,6 +442,85 @@
 ## Clean Resync — REJECTED (2026-04-17)
 > Удалить всё в целевых bin-ах и импортнуть заново. Nuclear option.
 > **Причины:** рвёт timeline references. Никто не нажмёт эту кнопку на живом проекте. Теоретическая фича без реального use case.
+
+---
+
+# DEV NOTES
+
+> Справочник для нас, не для пользователя. User-facing Settings dialog (§18) и
+> полноценный debug mode — v1.1+. Пока всё тестирование идёт через DevTools.
+
+## Как читать/заполнять этот чеклист
+
+**Чекбоксы:**
+- `[ ]` — не тестировалось
+- `[Да]` / `[Yes]` — прошло
+- `[Нет]` — не прошло или заблокировано. **Всегда** с inline-комментом почему.
+
+**Inline-комменты:** `<!-- причина/контекст -->` сразу после пункта. Для
+заметок когда тест блокирован, даёт неожиданное поведение, или нужен нюанс.
+
+**Обновление:** если тест-инструкция устарела (напр. `setDefaultTimeout(2000)`
+перестал срабатывать из-за изменённых chunks) — правим рецепт и ресетим
+соответствующие чекбоксы в `[ ]`, а не оставляем старые `[Нет]`.
+
+**Секции:**
+- §1–9 — MVP (стабильная база)
+- §10–14 — v1.0 features (shipped)
+- §14.5 — v1.1 defensive infrastructure (Bridge timeout, Cancel, Logger)
+- §15–21 — v1.1 features (planned)
+- KNOWN BUGS — баги для repro
+- REJECTED / DEFERRED — отклонённые идеи с причиной
+
+## Debug mode — internal reference
+
+> Off by default. Включается только через DevTools. Используем для диагностики
+> BUG-001 и будущих "зависов". Юзер-toggle отложен до §18.
+
+**Toggle (DevTools → Chrome `http://localhost:8088` → панель SheepDog):**
+```js
+Logger.isEnabled()        // false by default
+Logger.setEnabled(true)   // включить
+Logger.getPath()          // полный путь к log файлу
+Logger.getFolder()        // только директория проекта
+Logger.setEnabled(false)  // выключить
+```
+
+**Location:** `{projectDir}/sheepdog-debug.log` — рядом с `.prproj`.
+
+**Format:** `[ISO-timestamp] [LEVEL] [component] message`
+- Levels: `INFO` / `WARN` / `ERROR`
+- Append-only, без перезаписи между сессиями.
+
+**Rotation:** при > 10 MB текущий log переименовывается в `.1`, старые сдвигаются
+(`.1 → .2 → .3`). `.3` удаляется. Итого максимум 4 файла на диске.
+
+**Что логируется сейчас:**
+- `App`: Panel started, Sync All started/scan done, Sync folder, Auto Sync
+  toggle ON/OFF, Cancel click, Mirror deletion, Diagnose failure
+- `Importer`: Flush complete (imported/skipped/errors/cancelled), Chunk stalled
+
+**Чего НЕ логируется (кандидаты если встретим BUG-001 снова):**
+- Per-chunk Bridge calls (paths + bin + raw result)
+- Failed chunk error messages (сейчас только в `console.error`)
+- Watcher events (file detected / deleted / ignored)
+
+**Расширяем по необходимости** — не добавляем логи спекулятивно.
+
+## Важные файлы для отладки
+
+- `{projectDir}/sheepdog-settings.json` — глобальные настройки (toggle state,
+  Bridge timeout, debugMode, allowed extensions)
+- `{projectDir}/sheepdog-folders.json` — watch folders config (SOT)
+- `{projectDir}/sheepdog-debug.log[.1/.2/.3]` — debug log (если включён)
+
+## Вызов панели + DevTools
+
+1. `%APPDATA%\Adobe\CEP\extensions\` должен содержать symlink на `sheepdog/`
+2. Registry: `HKEY_CURRENT_USER\SOFTWARE\Adobe\CSXS.11\PlayerDebugMode = 1`
+3. Premiere → Window → Extensions → SheepDog
+4. DevTools: Chrome → `http://localhost:8088` → клик по панели SheepDog
+5. **CEP кэширует JS** — после правок всегда close/open панели, иначе старый код.
 
 ---
 

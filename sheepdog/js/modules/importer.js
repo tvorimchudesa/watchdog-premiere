@@ -90,11 +90,11 @@ var Importer = (function () {
     /**
      * Flush queue in chunks, grouped by target bin.
      * Progress fires per chunk completion. Cancellable via Importer.cancel().
-     * @returns {Promise<{imported: number, errors: number, cancelled: boolean}>}
+     * @returns {Promise<{imported: number, skipped: number, errors: number, cancelled: boolean}>}
      */
     flush: function () {
       if (importing || queue.length === 0) {
-        return Promise.resolve({ imported: 0, errors: 0, cancelled: false });
+        return Promise.resolve({ imported: 0, skipped: 0, errors: 0, cancelled: false });
       }
 
       importing = true;
@@ -104,6 +104,7 @@ var Importer = (function () {
       var items = queue.splice(0);
       var total = items.length;
       var imported = 0;
+      var skipped = 0;
       var errors = 0;
 
       var groups = {};
@@ -125,7 +126,12 @@ var Importer = (function () {
       function finish(cancelled) {
         importing = false;
         currentCancelToken = null;
-        var result = { imported: imported, errors: errors, cancelled: !!cancelled };
+        var result = {
+          imported: imported,
+          skipped: skipped,
+          errors: errors,
+          cancelled: !!cancelled,
+        };
         if (completeCallback) completeCallback(result);
         return result;
       }
@@ -153,8 +159,11 @@ var Importer = (function () {
           .then(function (result) {
             clearTimeout(stallTimer);
             if (result && result.success) {
-              imported += result.imported || 0;
-              errors += task.paths.length - (result.imported || 0);
+              var got = result.imported || 0;
+              var skip = result.skipped || 0;
+              imported += got;
+              skipped += skip;
+              errors += task.paths.length - got - skip;
             } else {
               errors += task.paths.length;
               console.error("[Importer] Chunk failed for bin " + task.bin + ":",
@@ -162,7 +171,7 @@ var Importer = (function () {
             }
             if (progressCallback) {
               progressCallback({
-                done: imported + errors,
+                done: imported + skipped + errors,
                 total: total,
                 chunkIndex: chunkIndex,
                 chunkTotal: totalChunks,
@@ -181,7 +190,7 @@ var Importer = (function () {
             console.error("[Importer] Bridge error:", msg);
             if (progressCallback) {
               progressCallback({
-                done: imported + errors,
+                done: imported + skipped + errors,
                 total: total,
                 chunkIndex: chunkIndex,
                 chunkTotal: totalChunks,
