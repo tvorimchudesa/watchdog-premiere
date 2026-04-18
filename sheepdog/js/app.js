@@ -248,8 +248,7 @@
   });
 
   Importer.onStall(function (info) {
-    progressText.textContent = "Importing... this batch is slow (chunk " +
-      info.chunkIndex + "/" + info.chunkTotal + ")";
+    progressText.textContent = "Importing \u2014 still working...";
     Logger.warn("Importer", "Chunk stalled " + info.chunkIndex + "/" +
       info.chunkTotal + " after " + info.stuckMs + "ms");
   });

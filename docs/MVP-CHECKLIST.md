@@ -262,6 +262,37 @@
 - [ ] Rotate (ручной тест — опционально): создать фейковый log > 10MB → следующая запись триггерит rotate, создаются `.1`, `.2`, `.3`
 - [ ] Settings dialog с toggle "Debug mode" — отложено до §18
 
+### 14.6. Silent import attempt — partial (non-blocking)
+> Обнаружено во время §14.5 testing (см. `docs/visual-reports/2026-04-18-progress-bar/`).
+> Юзер сообщил "мерцание" → кадры показали: наш SheepDog bar работает ровно, а
+> **нативная Premiere-модалка "Import Files..."** всплывает **1 раз на каждый batch**.
+> Для 157 файлов / chunk=10 — 16 миганий. Это и есть perceived flicker.
+>
+> **Attempted fix:** `suppressUI=true` во 2-м параметре `app.project.importFiles(...)`
+> в [host.jsx:80](sheepdog/jsx/host.jsx#L80).
+>
+> **Результат:** модалка **продолжает появляться**. Юзер подтвердил 2026-04-18.
+>
+> **Root cause flag-а:** по документации Adobe `suppressUI=true` подавляет
+> **per-file warning/error dialogs** (bad file, unsupported codec, etc), но НЕ
+> подавляет центральную прогресс-модалку "Import Files..." — она hardcoded
+> в Premiere для любого batch-импорта и недоступна через ExtendScript API.
+>
+> **Решение оставить `suppressUI=true`:** per-file warnings всё ещё не
+> показываются (defensive good), ручные импорты юзера не затрагиваются.
+> Мы не ухудшили UX — только не улучшили main modal flicker.
+>
+> **Что делать с мерцанием:** не лечим на уровне flag-а. Философское решение
+> записано в §22 и §22.5 — flicker принимаем как цену defensive chunking,
+> сокращаем количество модалок через dynamic chunking (когда-нибудь).
+
+- [Нет] Sync All на папке с 100+ файлами → Premiere-модалка "Import Files..." **не появляется** ни разу *(не достигнуто — модалка hardcoded в Premiere)*
+- [ ] Наш SheepDog bar обновляется как раньше (`X/N`)
+- [ ] Cancel button работает
+- [ ] Файлы успешно импортируются (флаг не блокирует сам import)
+- [ ] Проверить что warnings ExtendScript (напр. unsupported codec) не теряются — если файл не импортится, он попадает в `errors` в статусе
+- [ ] File → Import вручную в Premiere → модалка импорта показывается как обычно (мы не сломали нативный UX)
+
 ---
 
 # v1.1 Features — PLANNED
@@ -359,20 +390,31 @@
 - [ ] Статус обновляется: при Manual Sync / Sync All / Auto Sync tick
 - [ ] Файлы которые юзер релинкнул вне watch folders → "outside watched folders" (не удалять, не тянуть)
 
-## 22. Progress bar improvements — PLANNED
-> Текущий progress bar показывает только "Importing X/Y..." и % fill.
-> При chunked-импорте (§14.5.3) и dedupe-heavy папках этого мало — юзер не
-> видит что происходит: сколько chunks осталось, сколько уже в проекте, почему
-> "застыло". Прогресс = коммуникация, не декорация.
+## 22. Progress bar informativeness — PLANNED
+> **Контекст из §14.6:** нативная Premiere-модалка "Import Files..." всплывает
+> 1 раз на каждый chunk (hardcoded, не подавляется). Убрать её мы не можем.
+>
+> **Философский выбор (записан 2026-04-18):** chunking оставляем обязательным.
+> Это safety net против silent Premiere failures (см. BUG-001) — каждый chunk
+> success = heartbeat, подтверждающий что канал связи с Premiere жив. Без
+> chunking один hang = force-quit Premiere.
+>
+> Мерцание модалок принимаем как **плату за наблюдаемость**. Маскировать не
+> пытаемся — пытаемся делать процесс **прозрачнее** для юзера, чтобы он читал
+> flicker как "работает", а не "глючит".
+>
+> UX-принцип: chunks/batches/SRP — implementation detail, **не leak-ать** в UI.
+> Юзер видит только "файлы импортируются, процесс жив, можно отменить".
 >
 > Implementation hooks уже есть: `progressCallback` получает
 > `{done, total, chunkIndex, chunkTotal, stalled}`, `stallCallback` — `{chunkIndex, chunkTotal, stuckMs}`.
-> Большинство пунктов — работа в `showProgress()` в [app.js](sheepdog/js/app.js#L34-L39).
+> Поля `chunkIndex/chunkTotal` используем **внутри** для stall-детекции,
+> **наружу не показываем**. Большинство пунктов — работа в `showProgress()` в [app.js](sheepdog/js/app.js#L34-L39).
 
 ### 22.1. Live-информация во время импорта
-- [ ] Chunk-счётчик в статусе: `"Importing 45/152 (chunk 5/16)"` — юзер видит что batch-прогресс жив
 - [ ] Live skipped count: `"Importing 45/152 (12 already in project)"` — не ждём финала чтобы увидеть что dedupe работает
 - [ ] Live errors count если > 0: `"Importing 45/152 (3 failed)"` — ранняя видимость проблем
+- [ ] Имя текущего "heavy" файла в stall-статусе: `"Still importing: RED_0471.R3D (large file)..."` — убирает тревогу "плагин завис"
 
 ### 22.2. Stall-состояние визуально
 - [ ] При `onStall` progress bar меняет цвет (оранжевый/жёлтый) — не только текст
@@ -384,10 +426,134 @@
 - [ ] Не показывать ETA для коротких импортов (< 3 chunks) — враньё на малых n
 - [ ] Сбрасывается при stall (чтобы не показывать неактуальный ETA)
 
-### 22.4. Final state polish
+### 22.4. Upfront estimate + честный warning (premium touch)
+- [ ] Перед Sync All: посчитать общий размер в байтах, показать `"157 files · 12.4 GB · ~2 min"` + кнопка Start
+- [ ] Указать cancel-latency: `"Cancel may take up to 8s"` — прозрачность про лимиты Premiere batch API
+- [ ] Skip для малых импортов (< 20 файлов / < 500MB) — не шумим на быстрых операциях
+
+### 22.5. Final state polish
 - [ ] `hideProgress()` с задержкой 1-2s после complete — юзер успевает прочитать финальный статус
 - [ ] Fade-out анимация вместо резкого `display:none`
 - [ ] Cancel button исчезает синхронно с progress bar (а не отдельно)
+
+---
+
+## 23. Dev Observability — rolling log + dump triggers — PRIORITY (next)
+> **Мотивация:** BUG-001 (soft-lock на "0 of N") обнаружен, но **не воспроизводим**.
+> Без лога мы не найдём root cause даже при повторном hit — в момент бага
+> user-facing context теряется, console CEF может быть закрыта, state плагина
+> неизвестен.
+>
+> Rolling log = **ловушка для будущих soft-lock кейсов**. Первое же воспроизведение
+> → дамп → полный трейс событий за 5-10 минут до бага → root cause.
+>
+> **Эта секция — prerequisite к:** §14.5.2-4 (Cancel/chunking/debug log тесты
+> станут прямыми, лог уже живой), расследованию BUG-001, любому будущему hang-у.
+>
+> **Принцип apple-coding:** Logger владеет ring buffer + dump. Никто больше не
+> пишет файлы логов. SRP: Logger logs.
+
+### 23.1. Ring buffer в Logger
+- [ ] Last 1000 записей в памяти (configurable, default 1000)
+- [ ] Каждая запись: `{timestamp, level, module, event, payload}` (JSON-serializable)
+- [ ] Overflow policy: FIFO, новые вытесняют старые
+- [ ] `Logger.getBuffer()` → array копия для dump
+- [ ] `Logger.clearBuffer()` — после успешного dump'а
+
+### 23.2. Dump triggers
+Все триггеры дампят **один и тот же buffer**, разница только в имени файла и prefix:
+- [ ] **Panel close** → `session-YYYY-MM-DDTHH-mm-ss.log` (normal case)
+- [ ] **Uncaught error** (window.onerror) → `crash-YYYY-MM-DDTHH-mm-ss.log`
+- [ ] **Timeout в Bridge** → `timeout-YYYY-MM-DDTHH-mm-ss.log`
+- [ ] **Cancel нажат** → `cancel-YYYY-MM-DDTHH-mm-ss.log`
+- [ ] **Manual dump** (dev mode button) → `manual-YYYY-MM-DDTHH-mm-ss.log`
+
+### 23.3. Storage + rotation
+- [ ] Путь: `{projectDir}/sheepdog-logs/` (рядом с `sheepdog-folders.json`)
+- [ ] Auto-create папку при первом dump'е
+- [ ] Keep last 10 сессий, auto-delete старше
+- [ ] `.gitignore`: `sheepdog-logs/` (логи не в репо)
+
+### 23.4. Observability в коде (где логируем)
+Нужно покрыть **все точки жизни импорта** — чтобы при soft-lock было видно
+в какой именно момент обрыв:
+- [ ] `Importer.enqueue()` — входящие задачи
+- [ ] `Importer.flush()` start/end
+- [ ] Chunk.start / chunk.complete / chunk.error / chunk.timeout
+- [ ] `Bridge.importFiles()` call / return / timeout / cancel
+- [ ] `CSInterface.evalScript` call / callback-fired
+- [ ] Host.jsx: enter function / exit function (success/error)
+- [ ] Lock state changes: `isImporting = true/false` с причиной
+
+### 23.5. Защита от утечки
+- [ ] НЕ логируем содержимое файлов (только paths + sizes)
+- [ ] `Logger.sanitize()` stub — для будущего PII-фильтра (имена клиентов в project paths). Сейчас nop.
+- [ ] `.gitignore` для `sheepdog-logs/` чтобы никогда не ушло в public
+
+### 23.6. Dev mode toggle
+- [ ] `SettingsManager.get("devMode")` — если `true`, в panel footer появляется кнопка "Dump log now"
+- [ ] По умолчанию `false` для production; переключаем через settings.json вручную в dev-сессиях
+- [ ] В dev mode buffer size = 5000 (больше контекста для воспроизведения багов)
+
+### 23.7. Тест
+- [ ] Sync All на 50+ файлах → panel close → session log создан в `sheepdog-logs/`
+- [ ] Симулировать timeout (через `Bridge.setDefaultTimeout(100)` из §14.5.1) → timeout log создан
+- [ ] Лог содержит `chunk.start` без matching `chunk.complete` на том чанке где сработал timeout
+- [ ] Открыть лог — читается как timeline, можно реконструировать что произошло
+- [ ] После 11 сессий — в папке ровно 10 файлов, самый старый удалён
+
+---
+
+## 24. Dynamic chunk sizing — PLANNED (parked)
+> Сейчас `DEFAULT_CHUNK_SIZE = 10` (fixed) в [importer.js:20](sheepdog/js/modules/importer.js#L20).
+> Для тяжёлых файлов (ProRes/R3D/BRAW) это даёт chunk duration ~30-50s, из-за чего
+> Cancel latency становится **~30-40s** — фактически "кнопка-обманка".
+>
+> **Цель:** держать chunk duration в 5-10s независимо от веса файлов. Это:
+> - гарантирует responsive Cancel (≤10s задержка)
+> - держит stall-детект быстрым (timeout fires раньше)
+> - уменьшает кол-во модалок для тяжёлых файлов (естественно, не искусственно)
+>
+> **Почему parked:** текущего fixed chunk=10 хватает для MVP. Динамический
+> чанкинг — оптимизация, которую делаем **после** Dev Observability (§23),
+> чтобы tune на реальной telemetry, а не на догадках.
+>
+> **Приоритет относительно §22:** §24 важнее §22. §22 — косметика (цвет bar,
+> ETA, fade-out), §24 — управляемость (Cancel-latency, stall-детект скорость,
+> кол-во модалок). UX-выигрыш от §24 больше, чем от §22.
+
+### От чего может зависеть chunk size
+
+| Параметр | Сигнал | Доступен в CEP? |
+|---|---|---|
+| Byte budget | `fs.statSync(path).size` | ✓ |
+| Extension weight | `.r3d/.braw` → ×5, `.mp4` → ×1 (lookup table) | ✓ |
+| Historical pace | `lastChunkDuration / lastChunkFiles` → корректировка | ✓ (мерим сами) |
+| Total batch size | 1000 файлов → chunk поменьше для progress granularity | ✓ |
+| System load (CPU/RAM/IO) | — | ✗ (CEP не даёт) |
+
+**Наиболее полезная комбинация:** byte budget + historical adjust. Байт-бюджет
+как первичный расчёт, historical — корректировка после 2-3 чанков.
+
+### Примерная схема (для будущей имплементации)
+
+```js
+chunkBudget = 200 * 1024 * 1024;  // ~5-10s per chunk на типичных SSD
+minChunk = 1;                      // never go below (= per-file import)
+maxChunk = 20;                     // для мелких файлов не рвём гранулярность
+historicalMultiplier = 1.0;        // 0.5-2.0 диапазон, подстраиваем
+```
+
+Для mp4 ~500MB это даст chunk ≈ 1-2, для mp4 ~50MB — chunk ≈ 4, для ProRes 2GB —
+chunk = 1. ProRes 10GB — chunk = 1 (floor), duration будет большая, но это
+минимум которое можно Premiere скормить.
+
+### 24 checkpoints
+- [ ] Extract `chunkSize` логику из `enqueue()` в отдельную функцию `computeChunkSize(tasks)`
+- [ ] Реализовать byte-budget расчёт с `fs.statSync`
+- [ ] Добавить historical adjustment по measurement с предыдущих чанков
+- [ ] Unit test: на наборе из 157 mp4 + 10 ProRes chunks группируются по размеру
+- [ ] Visual test (visual-reports/): сравнить ритм мерцания fixed=10 vs dynamic
 
 ---
 
@@ -419,7 +585,9 @@
 > - Определённая последовательность действий (например drag-drop → Manual → Sync All)?
 >
 > **Workaround:** полный restart Premiere Pro.
-> **Fix-direction:** §14.5 (timeout + Cancel + debug log) сделает баг видимым и unstick'ает UI.
+> **Fix-direction:** §14.5 (timeout + Cancel) unstick'ает UI при повторном hit.
+> §23 (Dev Observability) даст timeline событий для reconstruction root cause
+> при первом же воспроизведении.
 >
 > **TODO:**
 > - [ ] Собрать repro: попробовать trigger-факторы в изоляции (много файлов / spec extension / post drag-drop / Flat ON)

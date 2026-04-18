@@ -73,8 +73,12 @@ function importFilesToBin(jsonArgs) {
       return JSON.stringify({ success: false, imported: 0, error: "Cannot find/create bin: " + binPath });
     }
 
-    // Import only new files
-    var importSuccess = app.project.importFiles(newPaths, false, targetBin, false);
+    // Import only new files.
+    // suppressUI=true hides per-file warning/error dialogs (bad file, codec,
+    // etc). It does NOT hide the central "Import Files..." progress modal —
+    // that one is hardcoded in Premiere for all batch imports and cannot be
+    // suppressed via ExtendScript. See visual-reports/2026-04-18-progress-bar.
+    var importSuccess = app.project.importFiles(newPaths, true, targetBin, false);
 
     return JSON.stringify({
       success: importSuccess,
