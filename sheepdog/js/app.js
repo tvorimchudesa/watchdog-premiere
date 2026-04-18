@@ -20,6 +20,7 @@
   var progressFill = document.getElementById("progress-fill");
   var progressText = document.getElementById("progress-text");
   var btnCancel = document.getElementById("btn-cancel");
+  var btnSaveLog = document.getElementById("btn-save-log");
   var statusEl = document.getElementById("status");
 
   // --- Project directory (derived from .prproj path) ---
@@ -259,8 +260,7 @@
       " skipped=" + result.skipped + " errors=" + result.errors +
       " cancelled=" + result.cancelled);
     if (result.cancelled) {
-      var total = result.imported + result.skipped + result.errors;
-      setStatus("Cancelled \u2014 " + result.imported + " of " + total + " imported");
+      setStatus("Cancelled \u2014 " + result.imported + " of " + result.total + " imported");
       return;
     }
     if (result.imported === 0 && result.errors === 0 && result.skipped === 0) {
@@ -410,6 +410,23 @@
     Logger.info("App", "Cancel clicked by user");
     Logger.dump("cancel");
     Importer.cancel();
+  });
+
+  btnSaveLog.addEventListener("click", function () {
+    Logger.info("App", "Manual log dump requested");
+    var dumpPath = Logger.dump("manual");
+    if (!dumpPath) {
+      setStatus("Log save failed — project not loaded?");
+      return;
+    }
+    setStatus("Log saved: " + dumpPath);
+    try {
+      var cs = new CSInterface();
+      var url = "file:///" + Logger.getDumpsDir().replace(/\\/g, "/");
+      cs.openURLInDefaultBrowser(url);
+    } catch (e) {
+      // Fallback: user can read path from status.
+    }
   });
 
   toggleAuto.addEventListener("change", function () {

@@ -200,11 +200,13 @@
 > 4. Добавь новую папку + Sync All → работает нормально (state чистый)
 > 5. Повтори с Auto Sync ON (добавь папку при Auto Sync) → Cancel тоже доступен
 
-- [ ] Cancel button появляется одновременно со статусом "Importing..." (секунда 0)
-- [ ] Клик Cancel → статус меняется на "Cancelled — X of Y imported" моментально (не ждём timeout)
-- [ ] Progress bar исчезает, Cancel button исчезает
-- [ ] Повторный Sync All сразу после Cancel работает
-- [ ] Cancel во время initial scan (Auto Sync ON + добавление папки) тоже работает
+- [Да] Cancel button появляется одновременно со статусом "Importing..." (секунда 0)
+- [Да] Клик Cancel → статус меняется на "Cancelled — X of Y imported" моментально (не ждём timeout) <!-- Предположим что файлов всего в папке N, индекс текущего батча = b, y = батчей всего, Но при отмене пишет не imported x of n, а x of 10*b -->
+- [Да] Progress bar исчезает, Cancel button исчезает
+- [Да] Повторный Sync All сразу после Cancel работает
+- [Да] Cancel во время initial scan (Auto Sync ON + добавление папки) тоже работает
+
+<!-- Понял, что смущает что если юзер вывел саббин или файл куда-то в проект, казалось бы это его ответственность, но он может случайно вывести сабин и обнаружить что что пре ресинке ему скажет что сколько то уже импортед, но он не будет понимать где они импортед. Можем ли мы как-то помочь юзеру тогда сортирнуть? Не перемещать за него ничего, но добавить условно ("already imported, outside watchfolder bin"). И мб добавить функцию "загнать овечек" или форс ресорт или чет такое, которые возвращает все бины и папки в вотч фолдер бин. Понятно что юзер мог уже смиксовать файлы с не ватчфолдерными. Тогда можно это решить так. есть watch folder x, там subbin y, отслеживаемые файлы z, и в проекте есть файлы s - импортнутные руками, f - случайный бин кастомно созданный. Юзер вынес y из x и кинул в f, допустим случайно, в y занес еще s, все смешалось. Юзер нажал gather sheeps, и тогда чтобы не рушить его структуру, мы не сносим вынесенный y в f, мы копируем название y и возвращаем в x, вернув в новый x/y все z от туда, а в f/y остались s. Это не надо сейчас исполнять сломя голову, но записать надо как мне кажется -->
 
 ### 14.5.3. Batch chunking (natural progress)
 > Importer разбивает queue на **chunks по 5-10 файлов** per Bridge.importFiles call.
@@ -218,11 +220,18 @@
 > 3. Если хочешь увидеть stall hint: в DevTools `Importer.setStallMs(1500)` + Sync All → после ~1.5s прогресса статус меняется на "Importing... this batch is slow (chunk X/Y)"
 > 4. Верни `Importer.setStallMs(10000)` чтобы stall hint не мешал
 
-- [ ] Sync All с 25+ файлами → прогресс обновляется пошагово (видны минимум 3 промежуточных значения)
-- [ ] Default chunk size = 10 (проверь в `sheepdog/js/modules/importer.js:21`)
-- [ ] Final status нормальный: "Imported N files" (или с `(M failed)` если были ошибки)
-- [ ] Stall hint: `Importer.setStallMs(1500)` + Sync All → статус "...this batch is slow..." появляется
-- [ ] Error в одном chunk (напр timeout) → остальные chunks продолжают работать, в финале "N imported (M failed)"
+- [Да] Sync All с 25+ файлами → прогресс обновляется пошагово (видны минимум 3 промежуточных значения)
+- [Да] Default chunk size = 10 (проверь в `sheepdog/js/modules/importer.js:21`)
+- [Да] Final status нормальный: "Imported N files" (или с `(M failed)` если были ошибки)
+- [Да] Stall hint: `Importer.setStallMs(1500)` + Sync All → статус "...this batch is slow..." появляется <!-- Работает, но я воспроизвел не при Importer.setStallMs(1500), а при баге! Но при баге сработало -->
+- [Частично] Error в одном chunk (напр timeout) → остальные chunks продолжают работать, в финале "N imported (M failed)" <!-- Если считать дедуп за фейлд, то да показывает -->
+
+<!-- Удалось воспроизвести баг ошибки импорта, но логгер не был включен, может из-за дедупа? Что я сделал описываю пошагово:
+1. Я удалил бин и снял ее затем из ватчтовера
+2. Попробовал для тестов в чеклисте добавить, но импорт встал
+3. Надо заметить что так не всегда срабатывает. 9 из 10 раз все ок
+4. Возможно мое предположение возможно было как-то связано с тем что один из файлов был в плейскхолдере МОГРТ, я снял бин и файл из примьера и мб это как то связано. Так как 1 файл мог уйти в скрытый рекавери стейт премьера, и что-то блокировать, но утверждать мы это не можем. Я предлагаю ничего не пытаться сейчас исправить. А включить скрытый логгер подефолту, который можно выгрузить и сохранить из рантайма, как консоль в девтулз. Типо кнопка save log, который в таких случаях даст возможность посмотреть что там было в процессах. То есть хотя бы держать в рантайме лог 50 ласт действий -->
+
 
 ### 14.5.4. Debug mode + log file
 > Event trace в `sheepdog-debug.log` рядом с проектом. Off by default.
@@ -253,14 +262,14 @@
 > Logger.setEnabled(false)
 > ```
 
-- [ ] `Logger.isEnabled()` возвращает `false` после старта (off by default)
-- [ ] `Logger.setEnabled(true)` включает логирование
-- [ ] `Logger.getPath()` возвращает путь вида `.../sheepdog-debug.log` рядом с проектом
-- [ ] Sync All / Auto Sync toggle / Cancel → в log появляются записи
-- [ ] Формат: `[ISO-timestamp] [LEVEL] [component] message`
-- [ ] OFF: новые события не пишутся в файл (существующие строки остаются)
-- [ ] Rotate (ручной тест — опционально): создать фейковый log > 10MB → следующая запись триггерит rotate, создаются `.1`, `.2`, `.3`
-- [ ] Settings dialog с toggle "Debug mode" — отложено до §18
+- [Да] `Logger.isEnabled()` возвращает `false` после старта (off by default)
+- [Да] `Logger.setEnabled(true)` включает логирование
+- [Да] `Logger.getPath()` возвращает путь вида `.../sheepdog-debug.log` рядом с проектом
+- [Да] Sync All / Auto Sync toggle / Cancel → в log появляются записи <!-- Не записывает, если удалить/добавить директорию из ватчфолдера (нажать на крестик или наоборот добавить драгдроп/add), надо добавить -->
+- [Да] Формат: `[ISO-timestamp] [LEVEL] [component] message`
+- [Да] OFF: новые события не пишутся в файл (существующие строки остаются)
+- [ ] Rotate (ручной тест — опционально): создать фейковый log > 10MB → следующая запись триггерит rotate, создаются `.1`, `.2`, `.3` <!-- Не ясно как проверять -->
+- [ ] Settings dialog с toggle "Debug mode" — отложено до §18 <!-- Вроде еще не сделано -->
 
 ### 14.6. Silent import attempt — partial (non-blocking)
 > Обнаружено во время §14.5 testing (см. `docs/visual-reports/2026-04-18-progress-bar/`).
@@ -287,11 +296,11 @@
 > сокращаем количество модалок через dynamic chunking (когда-нибудь).
 
 - [Нет] Sync All на папке с 100+ файлами → Premiere-модалка "Import Files..." **не появляется** ни разу *(не достигнуто — модалка hardcoded в Premiere)*
-- [ ] Наш SheepDog bar обновляется как раньше (`X/N`)
-- [ ] Cancel button работает
-- [ ] Файлы успешно импортируются (флаг не блокирует сам import)
-- [ ] Проверить что warnings ExtendScript (напр. unsupported codec) не теряются — если файл не импортится, он попадает в `errors` в статусе
-- [ ] File → Import вручную в Premiere → модалка импорта показывается как обычно (мы не сломали нативный UX)
+- [Да] Наш SheepDog bar обновляется как раньше (`X/N`)
+- [Да] Cancel button работает
+- [Да] Файлы успешно импортируются (флаг не блокирует сам import) <!-- Флаг suppressUI=true НЕ убран — остался в host.jsx:80. Центральную модалку Premiere он не подавляет (hardcoded), но продолжает подавлять per-file warning dialogs (unsupported codec, bad file header и т.п.). Полезность: во время batch импорта 157 файлов где 3 битые — без флага Premiere показал бы 3 модалки подряд с кнопкой OK, каждую надо закрыть. С флагом — тихо пропускаются, в нашем статусе "Imported 154 (3 failed)". Цена: теряем диагностику "почему именно" упал файл. Future improvement: ловить warnings на стороне host.jsx и класть в лог + expandable "Show errors" в панели. -->
+- [Да] Проверить что warnings ExtendScript (напр. unsupported codec) не теряются — если файл не импортится, он попадает в `errors` в статусе
+- [Да] File → Import вручную в Premiere → модалка импорта показывается как обычно (мы не сломали нативный UX)
 
 ---
 
@@ -554,6 +563,67 @@ chunk = 1. ProRes 10GB — chunk = 1 (floor), duration будет большая
 - [ ] Добавить historical adjustment по measurement с предыдущих чанков
 - [ ] Unit test: на наборе из 157 mp4 + 10 ProRes chunks группируются по размеру
 - [ ] Visual test (visual-reports/): сравнить ритм мерцания fixed=10 vs dynamic
+
+---
+
+## 25. Gather Sheep — non-destructive re-homing of moved watch items — PLANNED
+> **Мотивация (зафиксировано 2026-04-18):** юзер может вручную переместить
+> bin/file, импортированный через SheepDog, в свой кастомный бин вне watch
+> folder bin-а. Dedupe при re-sync скажет "already imported" — юзер не видит
+> **где именно** файл, потому что он переместил его сам. Это выглядит как
+> "SheepDog забыл мои файлы", хотя реально они в проекте.
+>
+> Соседняя проблема: юзер мог смешать нашу структуру с вручную добавленными
+> файлами, и просто вернуть всё обратно = разрушить его custom layout.
+>
+> **Принцип:** SheepDog **не трогает** то, что юзер переместил. Вместо этого
+> — копируем **structure shape** (bin-имена) обратно в watch folder bin и
+> возвращаем туда только файлы, которые **мы отслеживаем** (match по disk path).
+>
+> **Пример сценария:**
+> ```
+> Watch folder x
+> ├── subbin y (tracked files z)
+> Custom bin f (user-created, имеет вручную импортированные s)
+>
+> User moves: y (with z) → f, плюс кидает в y руками s
+> Result:     f contains y, y now has [z + s]
+>             x is empty
+>
+> User нажимает "Gather Sheep":
+>   - NE удаляем y из f (сохраняем custom structure юзера)
+>   - Копируем название y: создаём x/y (новый пустой bin под watch folder)
+>   - Перемещаем в x/y только z (tracked files) — определяем по disk paths
+>   - В f/y остаются s (untracked, user-added)
+>   - Итог: x/y содержит z (отслеживаемые), f/y содержит s (user's own)
+> ```
+>
+> **Признак "наше":** file.mediaPath попадает под один из watch folder paths.
+> **Признак "чужое":** mediaPath не попадает ни под один watch folder.
+
+### 25.1. UX
+- [ ] Кнопка "Gather Sheep" в Danger Zone секции (§20)
+- [ ] Перед выполнением: dry-run диалог "Will move N tracked files back to X watch folder bins. Untracked files stay where they are. Proceed?"
+- [ ] Прогресс-бар аналогичный import-у
+- [ ] Итоговый статус: "Gathered N files into M bins" + optional "K untracked files left in place"
+
+### 25.2. Что считается "наше" vs "чужое"
+- [ ] File "наше" = `item.getMediaPath()` попадает под watchFolder.path (+ subfolders если enabled)
+- [ ] Bin "наше" = имя совпадает с watch folder bin name ИЛИ с именем subfolder в watch folder
+- [ ] Edge case: файл "наш", но находится в "чужом" bin → перемещаем файл, bin не трогаем
+- [ ] Edge case: bin "наш", но находится вне watch folder bin → создаём дубликат внутри watch folder, файлы перемещаем, original bin не сносим (там могут быть user's items)
+
+### 25.3. ExtendScript API
+- [ ] `gatherSheep(watchFolders)` в host.jsx: проходит все items в проекте
+- [ ] Для каждого item с "наш" mediaPath: проверить текущий parent bin → если не в watch folder bin → `moveBin(item, targetBin)` с recreation структуры
+- [ ] Non-destructive: никогда не вызываем `deleteItem`, только `moveBin`/`createBin`
+- [ ] Возвращаем `{moved: N, untouched: M, createdBins: [...]}` для status
+
+### 25.4. Guards
+- [ ] Safety-cover UI (как §12 Flatten): locked → unlocked → active. Один лишний клик не выполнит
+- [ ] Dry-run режим: показать plan без выполнения — "Would move X, Y, Z"
+- [ ] Если watch folders пусты → кнопка disabled (нечего gather)
+- [ ] Undo? — Скорее всего невозможно в Premiere API без snapshot-инфры. Flat-style "активировать/деактивировать" тоже не подходит т.к. меняется user's custom structure. Поэтому safety-cover + dry-run критичны
 
 ---
 

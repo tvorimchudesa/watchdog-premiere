@@ -90,11 +90,11 @@ var Importer = (function () {
     /**
      * Flush queue in chunks, grouped by target bin.
      * Progress fires per chunk completion. Cancellable via Importer.cancel().
-     * @returns {Promise<{imported: number, skipped: number, errors: number, cancelled: boolean}>}
+     * @returns {Promise<{total: number, imported: number, skipped: number, errors: number, cancelled: boolean}>}
      */
     flush: function () {
       if (importing || queue.length === 0) {
-        return Promise.resolve({ imported: 0, skipped: 0, errors: 0, cancelled: false });
+        return Promise.resolve({ total: 0, imported: 0, skipped: 0, errors: 0, cancelled: false });
       }
 
       importing = true;
@@ -127,6 +127,7 @@ var Importer = (function () {
         importing = false;
         currentCancelToken = null;
         var result = {
+          total: total,
           imported: imported,
           skipped: skipped,
           errors: errors,

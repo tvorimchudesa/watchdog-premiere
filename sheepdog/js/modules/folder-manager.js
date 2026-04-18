@@ -23,6 +23,9 @@ var FolderManager = (function () {
   function init(projectDir) {
     configPath = path.join(projectDir, CONFIG_FILENAME);
     load();
+    if (typeof Logger !== "undefined") {
+      Logger.info("FolderManager", "init, loaded " + folders.length + " folder(s)");
+    }
   }
 
   /**
@@ -42,6 +45,9 @@ var FolderManager = (function () {
       }
     } catch (e) {
       console.error("[FolderManager] Failed to load config:", e.message);
+      if (typeof Logger !== "undefined") {
+        Logger.error("FolderManager", "load failed: " + e.message);
+      }
     }
 
     // Default: empty
@@ -69,6 +75,9 @@ var FolderManager = (function () {
       fs.writeFileSync(configPath, data, "utf8");
     } catch (e) {
       console.error("[FolderManager] Failed to save config:", e.message);
+      if (typeof Logger !== "undefined") {
+        Logger.error("FolderManager", "save failed: " + e.message);
+      }
     }
   }
 
@@ -124,6 +133,10 @@ var FolderManager = (function () {
 
       folders.push(folder);
       save();
+      if (typeof Logger !== "undefined") {
+        Logger.info("FolderManager", "add id=" + folder.id +
+          " path=" + folder.path + " bin=" + folder.targetBin);
+      }
       return folder;
     },
 
@@ -132,8 +145,18 @@ var FolderManager = (function () {
      * @param {string} id
      */
     remove: function (id) {
+      var before = folders.length;
+      var removed = null;
+      for (var i = 0; i < folders.length; i++) {
+        if (folders[i].id === id) { removed = folders[i]; break; }
+      }
       folders = folders.filter(function (f) { return f.id !== id; });
       save();
+      if (typeof Logger !== "undefined") {
+        var label = removed ? (removed.path + " (bin=" + removed.targetBin + ")") : id;
+        Logger.info("FolderManager", "remove " + label +
+          " (" + before + "→" + folders.length + ")");
+      }
     },
 
     /**
@@ -149,6 +172,11 @@ var FolderManager = (function () {
             if (key !== "id") folders[i][key] = changes[key];
           });
           save();
+          if (typeof Logger !== "undefined") {
+            var keys = Object.keys(changes).filter(function (k) { return k !== "id"; });
+            Logger.info("FolderManager", "update id=" + id +
+              " fields=[" + keys.join(",") + "] path=" + folders[i].path);
+          }
           return folders[i];
         }
       }
