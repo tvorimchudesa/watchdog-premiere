@@ -1,17 +1,30 @@
 // SheepDog — Panel v1.2 Concept Mockup for Figma Scripter
 // Paste into Scripter plugin in Figma.
 // Updates over v1 (2026-04-19):
+//   - §1 STATE refactor: no more dedicated STATE column / dots. State lives
+//     only as row-bg tint. Palette: red (missing) + amber (scanning) + calm
+//     (everything else, no signal). LABEL moves to leftmost position —
+//     Premiere parity + behavioral: feedback only on deviation.
 //   - §3 safety cover (iter 3): padlock icon REMOVED. Literal flip-up cover
 //     metaphor — matte gray fill = cover down. Unlocked = empty checkbox whose
 //     OWN border drains CCW from blue → gray over 4s (VectorNode with sampled
 //     rounded-rect perimeter path). Active = blue fill + ✓. Palette reduced to
 //     gray + blue on controls; amber reserved for informational Migration
 //     preview only.
-//   - §4 FLT model: rewritten for v2 cascade (FLT=ON row has NO bin;
-//     files flow up to nearest FLT=OFF ancestor)
-//   - §4.5 NEW: FLT UI guards — 5 mandatory helpers (effective target
-//     preview, hover tooltip, "show targets" toggle, STATE dot inheritance,
-//     migration counter in cover)
+//   - §4 FLT model: flat-override semantic. FLT=ON row stays as bin, its
+//     OWN subs dissolve into it. Children inherit parent's FLT by default.
+//     Explicit FLT=OFF on a child inside an FLT=ON region = anchor — survives
+//     as sub-bin with its own sub-structure.
+//   - FLT border states in row(): "swallowed" = dark-gray border (sub
+//     dissolved by ancestor), "anchor" = accent-blue border (explicit
+//     override inside flat region). State tints (red/amber) win over FLT
+//     border when both would apply.
+//   - §4.5 NEW: FLT UI guards — 5 mandatory helpers. Guard 4 now shows the
+//     three FLT border states (swallowed vs anchor vs calm).
+//   - §4.6 NEW: SUB=OFF subtree lockout. No subs watched → no bins → all
+//     descendant controls (SUB/REL/SEQ/FLT) rendered as inherited-off,
+//     NAME/PATH dimmed to textFade. row() supports cfg.subLocked that cascades
+//     the dim. Parent keeps its SUB checkbox active (SOT, toggleable).
 //   - §5 sort/reorder: replaced binary "drag enabled/disabled" with the
 //     auto-clear-on-drag flow + micro-toast with Undo
 
@@ -30,15 +43,14 @@ async function main() {
   const ANN_W = 540;
 
   const COL = {
-    ST: 14,
+    LABEL: 20,
     TREE: 14,
-    NAME: 170,
-    PATH: 256,
+    NAME: 200,
+    PATH: 262,
     SUB: 32,
     REL: 32,
     SEQ: 32,
     FLT: 32,
-    LABEL: 52,
     ACT: 118,
     RM: 22,
   };
@@ -167,32 +179,6 @@ async function main() {
     return f;
   }
 
-  function stateDot(color, opacity, hollow) {
-    const f = figma.createFrame();
-    f.resize(10, 10);
-    f.cornerRadius = 5;
-    if (hollow) {
-      f.fills = [];
-      setStroke(f, color, opacity != null ? opacity : 1, 1.5);
-    } else {
-      setFill(f, color, opacity != null ? opacity : 1);
-    }
-    return f;
-  }
-
-  function stateCell(dotNode) {
-    const f = figma.createFrame();
-    f.resize(COL.ST, ROW_H);
-    f.fills = [];
-    f.layoutMode = "HORIZONTAL";
-    f.layoutSizingHorizontal = "FIXED";
-    f.layoutSizingVertical = "FIXED";
-    f.primaryAxisAlignItems = "CENTER";
-    f.counterAxisAlignItems = "CENTER";
-    f.appendChild(dotNode);
-    return f;
-  }
-
   function treeCell(glyph, color, visible) {
     const f = figma.createFrame();
     f.resize(COL.TREE, ROW_H);
@@ -208,34 +194,40 @@ async function main() {
     return f;
   }
 
-  function checkbox(variant) {
+  // checkbox(variant, locked?) — when locked=true, semantic shape is preserved
+  // (on/off/inherited-on/inherited-off) but accent color swaps to textDim so
+  // the control reads "currently inactive, stored value will come back when
+  // the lock lifts". Used for SUB=OFF subtree lockout on descendants.
+  function checkbox(variant, locked) {
     const f = figma.createFrame();
     f.resize(14, 14);
     f.cornerRadius = 3;
+    const tint = locked ? C.textDim : C.accent;
+    const markColor = locked ? { r: 0.75, g: 0.75, b: 0.77 } : C.white;
     if (variant === "on") {
-      setFill(f, C.accent, 1);
-      setStroke(f, C.accent, 1, 1);
+      setFill(f, tint, locked ? 0.55 : 1);
+      setStroke(f, tint, locked ? 0.7 : 1, 1);
       f.layoutMode = "HORIZONTAL";
       f.layoutSizingHorizontal = "FIXED";
       f.layoutSizingVertical = "FIXED";
       f.primaryAxisAlignItems = "CENTER";
       f.counterAxisAlignItems = "CENTER";
-      f.appendChild(txt("✓", F.b, 10, C.white));
+      f.appendChild(txt("✓", F.b, 10, markColor));
     } else if (variant === "off") {
       f.fills = [];
-      setStroke(f, C.borderStrong, 1, 1);
+      setStroke(f, locked ? C.textFade : C.borderStrong, locked ? 0.65 : 1, 1);
     } else if (variant === "inherited-on") {
-      setFill(f, C.accent, 0.35);
-      setStroke(f, C.accent, 0.45, 1);
+      setFill(f, tint, locked ? 0.2 : 0.35);
+      setStroke(f, tint, locked ? 0.3 : 0.45, 1);
       f.layoutMode = "HORIZONTAL";
       f.layoutSizingHorizontal = "FIXED";
       f.layoutSizingVertical = "FIXED";
       f.primaryAxisAlignItems = "CENTER";
       f.counterAxisAlignItems = "CENTER";
-      f.appendChild(txt("✓", F.m, 9, C.white));
+      f.appendChild(txt("✓", F.m, 9, markColor));
     } else if (variant === "inherited-off") {
       f.fills = [];
-      setStroke(f, C.borderStrong, 0.45, 1);
+      setStroke(f, locked ? C.textFade : C.borderStrong, locked ? 0.3 : 0.45, 1);
     } else if (variant === "cover") {
       // Covered checkbox — matte fill = literal flip-up cover down.
       // Slightly thicker gray stroke. No iconography.
@@ -378,22 +370,31 @@ async function main() {
     wrap.paddingTop = 0; wrap.paddingBottom = 0;
     wrap.itemSpacing = 0;
     wrap.counterAxisAlignItems = "CENTER";
-    if (cfg.rowFill === "alt") setFill(wrap, C.panelAlt, 1);
-    else if (cfg.rowFill === "lost") {
+    // State → row-bg tint. Red = missing, amber = scanning. Everything else
+    // (ok, disabled, eye-closed) = calm, signal-free.
+    // FLT border (fltBorder prop) is a second visual channel — only applies on
+    // calm rows. "swallowed" = dark-gray border (sub dissolved by ancestor
+    // FLT=ON). "anchor" = accent-blue border (explicit FLT=OFF override inside
+    // a flat region). State tints always win over FLT border.
+    if (cfg.state === "missing") {
       setFill(wrap, C.danger, 0.08);
       setStroke(wrap, C.danger, 0.55, 1);
-    } else if (cfg.rowFill === "hover") setFill(wrap, C.panelHi, 1);
-    else wrap.fills = [];
+    } else if (cfg.state === "scanning") {
+      setFill(wrap, C.amber, 0.10);
+      setStroke(wrap, C.amber, 0.45, 1);
+    } else {
+      if (cfg.rowFill === "alt") setFill(wrap, C.panelAlt, 1);
+      else if (cfg.rowFill === "hover") setFill(wrap, C.panelHi, 1);
+      else wrap.fills = [];
+      if (cfg.fltBorder === "swallowed") setStroke(wrap, C.borderStrong, 0.7, 1);
+      else if (cfg.fltBorder === "anchor") setStroke(wrap, C.accent, 0.55, 1);
+    }
 
-    let dotNode;
-    if (cfg.state === "ok")            dotNode = stateDot(C.success, 1, false);
-    else if (cfg.state === "missing")  dotNode = stateDot(C.danger, 1, false);
-    else if (cfg.state === "scanning") dotNode = stateDot(C.amber, 1, true);
-    else if (cfg.state === "disabled") dotNode = stateDot(C.textFade, 1, false);
-    else if (cfg.state === "eye-closed") dotNode = stateDot(C.textDim, 1, true);
-    else if (cfg.state === "flat-inherit") dotNode = stateDot(C.success, 0.55, true);
-    else dotNode = stateDot(C.textDim, 0.3, true);
-    r.appendChild(stateCell(dotNode));
+    // Label cell (leftmost — Premiere parity). Empty circle = no label.
+    const labelBoxEarly = cell(COL.LABEL, labelDot(cfg.label));
+    if (cfg.labelInherited) labelBoxEarly.children[0].opacity = 0.4;
+    if (cfg.state === "disabled" || cfg.subLocked) labelBoxEarly.children[0].opacity = 0.35;
+    r.appendChild(labelBoxEarly);
 
     let glyph = null, treeColor = C.textDim;
     if (cfg.tree === "expanded") glyph = "⌄";
@@ -407,7 +408,7 @@ async function main() {
     nameInner.counterAxisAlignItems = "CENTER";
     if (cfg.indent) nameInner.appendChild(spacer(cfg.indent, 1));
     const nameFont = cfg.nameItalic ? F.i : F.m;
-    const nameColor = cfg.nameColor || (cfg.state === "disabled" ? C.textFade : C.text);
+    const nameColor = cfg.nameColor || ((cfg.state === "disabled" || cfg.subLocked) ? C.textFade : C.text);
     nameInner.appendChild(txt(cfg.name, nameFont, 12, nameColor));
     if (cfg.extraTargetChip) {
       nameInner.appendChild(chip(cfg.extraTargetChip, C.amber, 0.15));
@@ -416,7 +417,7 @@ async function main() {
     r.appendChild(nameBox);
 
     const pathBox = cell(COL.PATH, null, "MIN");
-    const pathColor = cfg.pathColor || (cfg.state === "missing" ? C.danger : C.textDim);
+    const pathColor = cfg.pathColor || (cfg.state === "missing" ? C.danger : (cfg.subLocked ? C.textFade : C.textDim));
     const pathFont = cfg.pathItalic ? F.i : F.r;
     const pathInner = hHug();
     pathInner.itemSpacing = 4;
@@ -426,14 +427,10 @@ async function main() {
     pathBox.appendChild(pathInner);
     r.appendChild(pathBox);
 
-    r.appendChild(cell(COL.SUB, checkbox(cfg.sub)));
-    r.appendChild(cell(COL.REL, checkbox(cfg.rel)));
-    r.appendChild(cell(COL.SEQ, checkbox(cfg.seq)));
-    r.appendChild(cell(COL.FLT, checkbox(cfg.flt)));
-
-    const labelBox = cell(COL.LABEL, labelDot(cfg.label));
-    if (cfg.labelInherited) labelBox.children[0].opacity = 0.4;
-    r.appendChild(labelBox);
+    r.appendChild(cell(COL.SUB, checkbox(cfg.sub, cfg.subLocked)));
+    r.appendChild(cell(COL.REL, checkbox(cfg.rel, cfg.subLocked)));
+    r.appendChild(cell(COL.SEQ, checkbox(cfg.seq, cfg.subLocked)));
+    r.appendChild(cell(COL.FLT, checkbox(cfg.flt, cfg.subLocked)));
 
     const actWrap = cell(COL.ACT, null, "MIN");
     const actInner = hHug();
@@ -478,7 +475,7 @@ async function main() {
     setFill(wrap, C.panelAlt, 1);
 
     const nameLabel = (opts && opts.nameSort) ? "NAME  " + opts.nameSort : "NAME  ↑";
-    wrap.appendChild(colHeaderCell(COL.ST, "", "CENTER"));
+    wrap.appendChild(colHeaderCell(COL.LABEL, "LBL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.TREE, "", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.NAME, nameLabel, "MIN", (opts && opts.nameSort === "") ? C.textDim : C.accent));
     wrap.appendChild(colHeaderCell(COL.PATH, "PATH", "MIN"));
@@ -486,7 +483,6 @@ async function main() {
     wrap.appendChild(colHeaderCell(COL.REL, "REL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.SEQ, "SEQ", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.FLT, "FLT", "CENTER"));
-    wrap.appendChild(colHeaderCell(COL.LABEL, "LABEL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.ACT, "ACTIONS", "MIN"));
     wrap.appendChild(colHeaderCell(COL.RM, "", "CENTER"));
     return wrap;
@@ -753,7 +749,7 @@ async function main() {
   const titleSec = vSec(contentW);
   titleSec.itemSpacing = 8;
   titleSec.appendChild(txt("SheepDog — Panel v1.2 Concept", F.b, 36, C.white, 44, 1));
-  titleSec.appendChild(txt("v2 FLT cascade · FLT UI guards · sort auto-clear on drag · 2026-04-19", F.r, 14, C.textDim, 20));
+  titleSec.appendChild(txt("STATE → row-bg tint · LBL leftmost · FLT flat-override · FLT border states · SUB=OFF subtree lockout · sort auto-clear on drag · 2026-04-19", F.r, 14, C.textDim, 20));
   titleSec.appendChild(divider(contentW, C.white, 0.08));
   root.appendChild(titleSec);
 
@@ -844,7 +840,6 @@ async function main() {
         { glyph: "🧲", color: C.text, opacity: 0.4 },
         { glyph: "👁", color: C.text, opacity: 0.4 },
       ],
-      rowFill: "lost",
     },
     {
       indent: 0, state: "scanning", tree: "collapsed",
@@ -899,25 +894,34 @@ async function main() {
   const ann = vSec(ANN_W);
   ann.itemSpacing = 20;
 
-  ann.appendChild(annCard("STATE dot · priority top→bottom wins", C.accent, [
-    { demo: demoBox(24, 18, stateDot(C.textFade, 1, false)),
-      title: "Disabled",
-      desc: "Row enabled=false. Whole row paused; nothing runs." },
-    { demo: demoBox(24, 18, stateDot(C.danger, 1, false)),
+  // State tint swatch — mini row-bg preview (matches row() palette).
+  function stateTintDemo(color) {
+    const f = figma.createFrame();
+    f.resize(28, 16);
+    f.cornerRadius = 2;
+    setFill(f, color, 0.1);
+    setStroke(f, color, 0.45, 1);
+    return f;
+  }
+  function calmTintDemo() {
+    const f = figma.createFrame();
+    f.resize(28, 16);
+    f.cornerRadius = 2;
+    setFill(f, C.panel, 1);
+    setStroke(f, C.border, 0.8, 1);
+    return f;
+  }
+
+  ann.appendChild(annCard("STATE — row-bg tint only (v1.2 refactor)", C.accent, [
+    { demo: demoBox(32, 20, stateTintDemo(C.danger)),
       title: "Missing path",
-      desc: "Folder on disk missing. Red border + faint danger backdrop. ⌕ Relink highlighted." },
-    { demo: demoBox(24, 18, stateDot(C.amber, 1, true)),
+      desc: "Red 8% backdrop + red 1px border. Path text turns red with ⚠ prefix. ⌕ Relink action highlighted." },
+    { demo: demoBox(32, 20, stateTintDemo(C.amber)),
       title: "Scanning",
-      desc: "Active scan/import. Row's ↻ action is highlighted." },
-    { demo: demoBox(24, 18, stateDot(C.textDim, 1, true)),
-      title: "Eye closed",
-      desc: "Per-folder auto-watch off (globally Auto Sync is still ON, this folder is ignored)." },
-    { demo: demoBox(24, 18, stateDot(C.success, 0.55, true)),
-      title: "Flat-inherit (NEW v1.2)",
-      desc: "Row has FLT=ON → no own bin. STATE reflects effective ancestor bin (hollow = 'not own, inherited')." },
-    { demo: demoBox(24, 18, stateDot(C.success, 1, false)),
-      title: "Idle OK",
-      desc: "Default green. Watcher is live, path resolved, nothing pending." },
+      desc: "Amber 10% backdrop + amber border. ↻ action icon highlighted. Transient — only one row at a time during chunked import." },
+    { demo: demoBox(32, 20, calmTintDemo()),
+      title: "Calm (everything else)",
+      desc: "Ok, disabled, eye-closed → no tint. Behavioral: feedback only on deviation. Disabled = faded text. Eye-closed = 👁 action icon. No green state dot — default IS the signal." },
   ]));
 
   ann.appendChild(annCard("Checkbox variants — inheritance visible at a glance", C.success, [
@@ -935,22 +939,62 @@ async function main() {
       desc: "Same, from ancestor OFF. Faded outline." },
     { demo: demoBox(24, 18, checkbox("cover")),
       title: "Safety cover (locked)",
-      desc: "Amber padlock. Click once → unlocks (4s timer). Click again → applies. Only one cover unlocked at a time." },
+      desc: "Matte gray fill = flip-up cover down. Click once → cover lifts (4s). Click again within window → applies. See §3 for full flow." },
     { demo: demoBox(24, 18, checkbox("disabled")),
       title: "Disabled (row off)",
       desc: "Row's enabled=false greys out all toggles. Settings remembered, not lost." },
+    { demo: demoBox(24, 18, checkbox("on", true)),
+      title: "Overridden ON · SUB locked",
+      desc: "Descendant of a SUB=OFF ancestor. Shape preserved (user's override still stored), accent swapped to textDim to signal \"currently frozen\". Flipping parent's SUB back restores the blue." },
+    { demo: demoBox(24, 18, checkbox("inherited-on", true)),
+      title: "Inherited ON · SUB locked",
+      desc: "Same cascade, applied to an inherited value. Faded grey — preserves the \"this flows from somewhere\" reading while signalling inactivity." },
   ]));
 
-  ann.appendChild(annCard("Row fill & text states", C.amber, [
-    { demo: demoBox(24, 18, stateDot(C.text, 0.3, false)),
+  // FLT-border demo — mini row-like swatch showing border state
+  function fltBorderDemo(borderColor, borderOpacity) {
+    const f = figma.createFrame();
+    f.resize(28, 16);
+    f.cornerRadius = 2;
+    setFill(f, C.panel, 1);
+    setStroke(f, borderColor, borderOpacity, 1);
+    return f;
+  }
+
+  ann.appendChild(annCard("Row ornamentation", C.amber, [
+    { demo: demoBox(32, 20, calmTintDemo()),
       title: "Alt zebra fill",
-      desc: "Every other row uses a +3% brightness fill for scanning ease." },
-    { demo: demoBox(24, 18, txt("Italic", F.i, 11, C.textDim)),
+      desc: "Every other calm row uses +3% brightness. State tints (red/amber) override zebra." },
+    { demo: demoBox(32, 20, txt("Italic", F.i, 11, C.textDim)),
       title: "Virtual row",
       desc: "Subfolder on disk, no record in JSON. Italic + muted. One click on any control materializes it." },
-    { demo: demoBox(24, 18, stateDot(C.danger, 1, false)),
-      title: "Path-lost row",
-      desc: "Red 1px border + 8% danger backdrop. Path text turns red with ⚠ prefix. ⌕ Relink pulses." },
+    { demo: demoBox(32, 20, labelDot(null)),
+      title: "No label / disabled",
+      desc: "Empty circle = user hasn't assigned a Premiere color label. Disabled row = label dot muted to 35%." },
+    { demo: demoBox(32, 20, fltBorderDemo(C.borderStrong, 0.7)),
+      title: "FLT swallowed (dark-gray border)",
+      desc: "Row's bin dissolves into nearest FLT=ON ancestor. Dark-gray 1px border marks the sub as part of a flat region. Files land in the flat ancestor's bin." },
+    { demo: demoBox(32, 20, fltBorderDemo(C.accent, 0.55)),
+      title: "FLT anchor (accent border)",
+      desc: "Explicit FLT=OFF inside an FLT=ON region — this row survives as its own sub-bin. Accent-blue 1px border signals \"I broke the cascade on purpose\". Its own subs follow its own FLT." },
+  ]));
+
+  // Subtree lockout demo — mini 4-checkbox strip at two states.
+  function lockoutStripDemo(variants, locked) {
+    const f = hHug();
+    f.itemSpacing = 4;
+    f.counterAxisAlignItems = "CENTER";
+    for (const v of variants) f.appendChild(checkbox(v, locked));
+    return f;
+  }
+
+  ann.appendChild(annCard("SUB=OFF subtree lockout", C.textDim, [
+    { demo: demoBox(100, 18, lockoutStripDemo(["off", "off", "off", "off"], false)),
+      title: "Parent — SUB unchecked (SOT)",
+      desc: "User explicitly turned SUB off. Checkbox stays solid-outline (active control, toggleable). Row itself stays calm — no lockout on parent." },
+    { demo: demoBox(100, 18, lockoutStripDemo(["inherited-off", "on", "inherited-off", "off"], true)),
+      title: "Descendants — stored values, frozen",
+      desc: "All 4 controls stay legible (their stored values remain visible) but accent is swapped to textDim. NAME/PATH dim to textFade. Flipping parent SUB back restores accent instantly." },
   ]));
 
   s1Row.appendChild(ann);
@@ -1230,47 +1274,125 @@ async function main() {
   root.appendChild(s3);
 
   // ==================================================
-  // SECTION 4 — FLT model v2 (cascade)
+  // SECTION 4 — FLT model (flat-override semantic)
+  // Three card pairs show the full rule set:
+  //   pair A — simple flat (subs inherit, all swallowed)
+  //   pair B — explicit anchor (FLT=OFF breaks the cascade locally)
+  //   pair C — nested override (FLT=ON inside an anchor)
   // ==================================================
   const s4 = vSec(contentW);
   s4.itemSpacing = 16;
   s4.appendChild(sectionTitle(
-    "4. FLT model — v2 cascade (resolved 2026-04-19)",
-    "FLT=ON row has NO bin. Files flow up to nearest FLT=OFF ancestor. Disk stays SOT; project flattens gracefully.",
+    "4. FLT model — flat-override (resolved 2026-04-19)",
+    "FLT on X controls X's own subs: ON dissolves them, OFF preserves them. X itself always stays as bin (unless an ancestor ate it). Children inherit parent's FLT; explicit flip = anchor.",
     contentW
   ));
 
-  // Two-tree comparison
-  const s4Row = hSec(contentW);
-  s4Row.itemSpacing = 40;
-  s4Row.counterAxisAlignItems = "MIN";
+  // ---- shared layout helper ----
+  const pairW = Math.floor((contentW - 20) / 2);
 
-  const diskBoxV2 = treeMini("On disk (SOT)", [
-    { glyph: "📁", text: "Footage", bold: true, tag: "FLT=OFF (own bin)", tagColor: C.success },
-    { glyph: "  📄", text: "promo.mp4" },
-    { glyph: "  📁", text: "day1", bold: true, tag: "FLT=ON (flat)", tagColor: C.amber },
-    { glyph: "    📄", text: "shot_A.mp4" },
-    { glyph: "    📄", text: "shot_B.mp4" },
-    { glyph: "    📁", text: "RAW", bold: true, tag: "FLT=OFF (own bin)", tagColor: C.success },
-    { glyph: "      📄", text: "take_01.mxf" },
-    { glyph: "      📄", text: "take_02.mxf" },
-  ], C.textDim);
+  function s4Pair(labelText, diskLines, projectLines) {
+    const pairWrap = vSec(contentW);
+    pairWrap.itemSpacing = 8;
 
-  const projectBoxV2 = treeMini("In Premiere (resolved via cascade)", [
-    { glyph: "📂", text: "Footage", bold: true, tag: "bin · FLT=OFF", tagColor: C.accent },
-    { glyph: "  📄", text: "promo.mp4", tag: "own file", tagColor: C.textDim },
-    { glyph: "  📄", text: "shot_A.mp4", tag: "from day1 (flat)", tagColor: C.amber },
-    { glyph: "  📄", text: "shot_B.mp4", tag: "from day1 (flat)", tagColor: C.amber },
-    { glyph: "  📂", text: "RAW", bold: true, tag: "bin · FLT=OFF", tagColor: C.accent },
-    { glyph: "    📄", text: "take_01.mxf" },
-    { glyph: "    📄", text: "take_02.mxf" },
-  ], C.accent);
+    // Label strip above pair
+    const labelRow = hHug();
+    labelRow.itemSpacing = 10;
+    labelRow.counterAxisAlignItems = "CENTER";
+    const labelChip = figma.createFrame();
+    labelChip.resize(6, 6); labelChip.cornerRadius = 3;
+    setFill(labelChip, C.accent, 1);
+    labelRow.appendChild(labelChip);
+    labelRow.appendChild(txt(labelText, F.s, 12, C.white, undefined, 0.3));
+    pairWrap.appendChild(labelRow);
 
-  s4Row.appendChild(diskBoxV2);
-  s4Row.appendChild(projectBoxV2);
-  s4.appendChild(s4Row);
+    const pairRow = hSec(contentW);
+    pairRow.itemSpacing = 20;
+    pairRow.counterAxisAlignItems = "MIN";
+    pairRow.appendChild(treeMini("On disk (SOT)", diskLines, C.textDim, pairW));
+    pairRow.appendChild(treeMini("In Premiere (resolved)", projectLines, C.accent, pairW));
+    pairWrap.appendChild(pairRow);
+    return pairWrap;
+  }
 
-  // Resolution rules table
+  // ---- PAIR A — simple flat ----
+  // day1=ON, RAW inherited → both dissolved into day1
+  s4.appendChild(s4Pair(
+    "A · Simple flat — only day1=ON, everything below inherits",
+    [
+      { glyph: "📁", text: "Footage", bold: true, tag: "FLT=OFF (keeps subs)", tagColor: C.success },
+      { glyph: "  📄", text: "promo.mp4" },
+      { glyph: "  📁", text: "day1", bold: true, tag: "FLT=ON (eats subs)", tagColor: C.amber },
+      { glyph: "    📄", text: "shot_A.mp4" },
+      { glyph: "    📄", text: "shot_B.mp4" },
+      { glyph: "    📁", text: "RAW", tag: "inherited ON (from day1)", tagColor: C.textDim },
+      { glyph: "      📄", text: "take_01.mxf" },
+      { glyph: "      📄", text: "take_02.mxf" },
+    ],
+    [
+      { glyph: "📂", text: "Footage", bold: true, tag: "bin (own)", tagColor: C.accent },
+      { glyph: "  📄", text: "promo.mp4" },
+      { glyph: "  📂", text: "day1", bold: true, tag: "bin (own, flat inside)", tagColor: C.accent },
+      { glyph: "    📄", text: "shot_A.mp4" },
+      { glyph: "    📄", text: "shot_B.mp4" },
+      { glyph: "    📄", text: "take_01.mxf", tag: "from RAW (swallowed)", tagColor: C.textDim },
+      { glyph: "    📄", text: "take_02.mxf", tag: "from RAW (swallowed)", tagColor: C.textDim },
+    ]
+  ));
+
+  // ---- PAIR B — explicit anchor ----
+  // day1=ON, RAW=OFF (explicit) → RAW survives as sub-bin, its files stay in RAW
+  s4.appendChild(s4Pair(
+    "B · Explicit anchor — RAW flips to FLT=OFF inside day1=ON flat region",
+    [
+      { glyph: "📁", text: "Footage", bold: true, tag: "FLT=OFF", tagColor: C.success },
+      { glyph: "  📄", text: "promo.mp4" },
+      { glyph: "  📁", text: "day1", bold: true, tag: "FLT=ON (eats subs)", tagColor: C.amber },
+      { glyph: "    📄", text: "shot_A.mp4" },
+      { glyph: "    📄", text: "shot_B.mp4" },
+      { glyph: "    📁", text: "RAW", bold: true, tag: "FLT=OFF (anchor)", tagColor: C.accent },
+      { glyph: "      📄", text: "take_01.mxf" },
+      { glyph: "      📄", text: "take_02.mxf" },
+    ],
+    [
+      { glyph: "📂", text: "Footage", bold: true, tag: "bin", tagColor: C.accent },
+      { glyph: "  📄", text: "promo.mp4" },
+      { glyph: "  📂", text: "day1", bold: true, tag: "bin (flat inside)", tagColor: C.accent },
+      { glyph: "    📄", text: "shot_A.mp4" },
+      { glyph: "    📄", text: "shot_B.mp4" },
+      { glyph: "    📂", text: "RAW", bold: true, tag: "anchor · bin (own subs)", tagColor: C.accent },
+      { glyph: "      📄", text: "take_01.mxf" },
+      { glyph: "      📄", text: "take_02.mxf" },
+    ]
+  ));
+
+  // ---- PAIR C — nested override ----
+  // day1=ON, RAW=OFF (anchor), TEMP=ON inside RAW → TEMP's subs dissolve into RAW
+  s4.appendChild(s4Pair(
+    "C · Nested override — TEMP=ON inside RAW=OFF anchor",
+    [
+      { glyph: "📁", text: "Footage", bold: true, tag: "FLT=OFF", tagColor: C.success },
+      { glyph: "  📁", text: "day1", bold: true, tag: "FLT=ON", tagColor: C.amber },
+      { glyph: "    📄", text: "shot_A.mp4" },
+      { glyph: "    📁", text: "RAW", bold: true, tag: "FLT=OFF (anchor)", tagColor: C.accent },
+      { glyph: "      📄", text: "take_01.mxf" },
+      { glyph: "      📁", text: "TEMP", bold: true, tag: "FLT=ON (flat inside RAW)", tagColor: C.amber },
+      { glyph: "        📄", text: "draft1.mxf" },
+      { glyph: "        📁", text: "scratch", tag: "inherited ON (from TEMP)", tagColor: C.textDim },
+      { glyph: "          📄", text: "alt_take.mxf" },
+    ],
+    [
+      { glyph: "📂", text: "Footage", bold: true, tag: "bin", tagColor: C.accent },
+      { glyph: "  📂", text: "day1", bold: true, tag: "bin (flat)", tagColor: C.accent },
+      { glyph: "    📄", text: "shot_A.mp4" },
+      { glyph: "    📂", text: "RAW", bold: true, tag: "anchor · bin (flat inside via TEMP=ON)", tagColor: C.accent },
+      { glyph: "      📄", text: "take_01.mxf" },
+      { glyph: "      📄", text: "draft1.mxf", tag: "from TEMP (swallowed)", tagColor: C.textDim },
+      { glyph: "      📄", text: "alt_take.mxf", tag: "from TEMP/scratch (swallowed)", tagColor: C.textDim },
+    ]
+  ));
+
+  // ---- Resolution rules table (covers pair C to show every lookup) ----
   const s4Table = vSec(contentW);
   s4Table.itemSpacing = 0;
   s4Table.cornerRadius = 8;
@@ -1278,7 +1400,7 @@ async function main() {
   setStroke(s4Table, C.border, 1, 1);
 
   const s4ColW1 = 320;
-  const s4ColW2 = 260;
+  const s4ColW2 = 300;
   const s4ColW3 = contentW - s4ColW1 - s4ColW2 - 48;
 
   const s4Head = hSec(contentW);
@@ -1286,8 +1408,8 @@ async function main() {
   s4Head.paddingTop = 10; s4Head.paddingBottom = 10;
   s4Head.itemSpacing = 16;
   setFill(s4Head, C.panelAlt, 1);
-  const h1 = cell(s4ColW1, txt("FILE", F.s, 10, C.textDim, undefined, 1), "MIN"); h1.resize(s4ColW1, 20);
-  const h2 = cell(s4ColW2, txt("NEAREST FLT=OFF ANCESTOR", F.s, 10, C.textDim, undefined, 1), "MIN"); h2.resize(s4ColW2, 20);
+  const h1 = cell(s4ColW1, txt("FILE  (pair C)", F.s, 10, C.textDim, undefined, 1), "MIN"); h1.resize(s4ColW1, 20);
+  const h2 = cell(s4ColW2, txt("NEAREST NON-SWALLOWED BIN", F.s, 10, C.textDim, undefined, 1), "MIN"); h2.resize(s4ColW2, 20);
   const h3 = cell(s4ColW3, txt("LANDS IN BIN", F.s, 10, C.textDim, undefined, 1), "MIN"); h3.resize(s4ColW3, 20);
   s4Head.appendChild(h1); s4Head.appendChild(h2); s4Head.appendChild(h3);
   s4Table.appendChild(s4Head);
@@ -1309,18 +1431,16 @@ async function main() {
     r.appendChild(c1); r.appendChild(c2); r.appendChild(c3);
     return r;
   }
-  s4Table.appendChild(s4TableRow("Footage/promo.mp4", "Footage (FLT=OFF)", "Footage", C.accent));
+  s4Table.appendChild(s4TableRow("Footage/day1/shot_A.mp4", "day1 (FLT=ON, files stay)", "day1", C.accent));
   s4Table.appendChild(divider(contentW, C.border, 0.6));
-  s4Table.appendChild(s4TableRow("Footage/day1/shot_A.mp4", "Footage (day1 flat)", "Footage", C.accent));
+  s4Table.appendChild(s4TableRow("Footage/day1/RAW/take_01.mxf", "RAW (FLT=OFF anchor)", "RAW (in day1)", C.accent));
   s4Table.appendChild(divider(contentW, C.border, 0.6));
-  s4Table.appendChild(s4TableRow("Footage/day1/shot_B.mp4", "Footage (day1 flat)", "Footage", C.accent));
+  s4Table.appendChild(s4TableRow("Footage/day1/RAW/TEMP/draft1.mxf", "RAW (TEMP swallowed by TEMP=ON into RAW)", "RAW (in day1)", C.accent));
   s4Table.appendChild(divider(contentW, C.border, 0.6));
-  s4Table.appendChild(s4TableRow("Footage/day1/RAW/take_01.mxf", "RAW (FLT=OFF)", "RAW (nested in Footage)", C.accent));
-  s4Table.appendChild(divider(contentW, C.border, 0.6));
-  s4Table.appendChild(s4TableRow("Footage/day1/RAW/take_02.mxf", "RAW (FLT=OFF)", "RAW (nested in Footage)", C.accent));
+  s4Table.appendChild(s4TableRow("Footage/day1/RAW/TEMP/scratch/alt_take.mxf", "RAW (scratch inherits TEMP=ON, both swallowed)", "RAW (in day1)", C.accent));
   s4.appendChild(s4Table);
 
-  // Decision log
+  // ---- Decision log ----
   const s4Decision = vSec(contentW);
   s4Decision.cornerRadius = 8;
   setFill(s4Decision, C.panel, 1);
@@ -1338,14 +1458,16 @@ async function main() {
   decHead.appendChild(txt("Decision log — 2026-04-19", F.s, 12, C.white, undefined, 0.5));
   s4Decision.appendChild(decHead);
   s4Decision.appendChild(txtW(
-    "Chose v2 (cascade). v1 guaranteed 1 row = 1 bin (simpler mentally) but forced nested bins on deep trees " +
-    "like Footage/day1/morning/cam_A/. v2 lets the user keep the UI tree (for navigation / overrides) " +
-    "while producing a flat bin pool in Premiere. Risks of v2 (unclear target, mental cascade) are mitigated by guards §4.5.",
+    "Chose flat-override. FLT is a per-row instruction about that row's OWN subs (ON eats, OFF preserves). " +
+    "Row itself always stays as bin unless swallowed by an ancestor's FLT=ON. Children inherit parent's " +
+    "effective FLT by default — explicit flip = anchor, breaks the cascade locally.",
     F.r, 12, C.text, contentW - 40, 18
   ));
   s4Decision.appendChild(txtW(
-    "Rejected alternative (v1 row-local): too rigid for complex hierarchies. Kept previous β-model conversation history in " +
-    "'v1 Panel Architecture Concept.md' §5.2.2 for audit trail.",
+    "Rejected alternatives: (a) strict full cascade (FLT=ON ancestor overrides all descendants, no anchor escape) — " +
+    "forces user to split into multiple watch folders to get sub-bin preservation, conflicts with import dedup. " +
+    "(b) \"FLT=ON row has no bin\" (original v2) — contradicts user intuition that Footage=OFF preserves day1 as bin. " +
+    "Flat-override gives local readability + respects default-inheritance semantics.",
     F.r, 11, C.textDim, contentW - 40, 16
   ));
   s4.appendChild(s4Decision);
@@ -1382,8 +1504,8 @@ async function main() {
   g1Head.appendChild(txt("Guard 1 · Effective target preview", F.s, 13, C.white, undefined, 0.5));
   g1.appendChild(g1Head);
   g1.appendChild(txtW(
-    "FLT=ON row shows its resolved target next to the NAME as an amber chip \"→ parent bin\". Without this, " +
-    "the row looks empty in terms of destination — user would look for a bin that by design does not exist.",
+    "Swallowed row (sub dissolved by ancestor's FLT=ON) shows its resolved target next to the NAME as an amber chip \"→ ancestor bin\". " +
+    "Without this, the row looks empty in terms of destination — user would look for a bin that by design does not exist.",
     F.r, 11, C.textDim, contentW - 44, 16
   ));
 
@@ -1399,17 +1521,18 @@ async function main() {
   g1Panel.appendChild(row({
     indent: 0, state: "ok", tree: "expanded",
     name: "Footage", path: "E:/Projects/FILM/Footage",
-    sub: "on", rel: "off", seq: "off", flt: "off",
+    sub: "on", rel: "off", seq: "off", flt: "on",
     label: C.labelCerulean,
     actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
   }));
   g1Panel.appendChild(divider(PANEL_W, C.border, 0.4));
   g1Panel.appendChild(row({
-    indent: 18, state: "flat-inherit", tree: "expanded",
+    indent: 18, state: "ok", tree: "expanded",
     name: "day1", path: "…/Footage/day1",
-    sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "on",
+    sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-on",
     label: null, labelInherited: true,
     extraTargetChip: "→ Footage",
+    fltBorder: "swallowed",
     actions: [{ glyph: "↻", color: C.text, opacity: 0.6 }, { glyph: "⌕", color: C.text, opacity: 0.6 }, { glyph: "🧲", color: C.text, opacity: 0.6 }, { glyph: "👁", color: C.text, opacity: 0.6 }],
     rowFill: "alt",
   }));
@@ -1419,11 +1542,12 @@ async function main() {
     name: "RAW", path: "…/day1/RAW",
     sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "off",
     label: null, labelInherited: true,
+    fltBorder: "anchor",
     actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
   }));
   g1.appendChild(g1Panel);
   g1.appendChild(txt(
-    "Note — \"day1\" row shows amber \"→ Footage\" chip. STATE dot is hollow-green (flat-inherit) to signal \"no own bin, inherits status\".",
+    "Note — Footage=ON swallows day1 (dark-gray border + amber \"→ Footage\" chip). RAW=OFF = explicit anchor inside ON region (accent-blue border, keeps its own bin).",
     F.i, 11, C.amber, undefined, 0
   ));
   s45.appendChild(g1);
@@ -1479,7 +1603,7 @@ async function main() {
   const g2Row = hHug();
   g2Row.itemSpacing = 6;
   g2Row.counterAxisAlignItems = "CENTER";
-  g2Row.appendChild(stateDot(C.success, 0.55, true));
+  g2Row.appendChild(labelDot(C.labelCerulean));
   g2Row.appendChild(txt("day1", F.m, 11, C.text));
   g2Row.appendChild(chip("→ Footage", C.amber, 0.15));
   g2Demo.appendChild(g2Row);
@@ -1517,18 +1641,28 @@ async function main() {
     C.amber, g3Demo
   ));
 
-  // Guard 4 demo — STATE dot inheritance
-  const g4Demo = hHug();
-  g4Demo.itemSpacing = 10;
-  g4Demo.counterAxisAlignItems = "CENTER";
-  g4Demo.appendChild(stateDot(C.success, 1, false));
-  g4Demo.appendChild(txt("→", F.b, 14, C.textDim));
-  g4Demo.appendChild(stateDot(C.success, 0.55, true));
-  g4Demo.appendChild(txt("→", F.b, 14, C.textDim));
-  g4Demo.appendChild(stateDot(C.danger, 0.55, true));
+  // Guard 4 demo — three FLT border states (calm / swallowed / anchor)
+  function g4MiniRow(label, borderColor, borderOpacity) {
+    const rr = hSec(160);
+    rr.paddingLeft = 8; rr.paddingRight = 8;
+    rr.paddingTop = 5; rr.paddingBottom = 5;
+    rr.itemSpacing = 6;
+    rr.counterAxisAlignItems = "CENTER";
+    setFill(rr, C.panel, 1);
+    if (borderColor) setStroke(rr, borderColor, borderOpacity, 1);
+    rr.appendChild(labelDot(C.labelCerulean));
+    rr.appendChild(txt(label, F.m, 10, C.text));
+    return rr;
+  }
+  const g4Demo = vHug();
+  g4Demo.itemSpacing = 4;
+  g4Demo.counterAxisAlignItems = "MIN";
+  g4Demo.appendChild(g4MiniRow("Footage (calm)", null, 0));
+  g4Demo.appendChild(g4MiniRow("day1 (swallowed)", C.borderStrong, 0.7));
+  g4Demo.appendChild(g4MiniRow("RAW (anchor)", C.accent, 0.55));
   g234Row.appendChild(guardCard(
-    4, "STATE dot inherits",
-    "FLT=ON row has no bin, so its STATE is hollow & reflects the ancestor. Ancestor green → hollow-green. Ancestor red → hollow-red.",
+    4, "FLT border states",
+    "Second visual channel, orthogonal to state tint. Dark-gray border = swallowed (sub dissolved by ancestor FLT=ON). Accent-blue = anchor (explicit FLT=OFF inside ON region). No border = calm. State tints (red/amber) always win.",
     C.amber, g4Demo
   ));
 
@@ -1560,6 +1694,115 @@ async function main() {
   s45.appendChild(g5);
 
   root.appendChild(s45);
+
+  // ==================================================
+  // SECTION 4.6 — SUB=OFF subtree lockout (NEW v1.2)
+  // ==================================================
+  const s46 = vSec(contentW);
+  s46.itemSpacing = 16;
+  s46.appendChild(sectionTitle(
+    "4.6 SUB=OFF subtree lockout (resolved 2026-04-19)",
+    "Full override. No subs watched → no bins created → nothing flows to Premiere from descendants. All child controls cascade to inherited-off; NAME/PATH dim to textFade. Parent keeps SUB active as SOT.",
+    contentW
+  ));
+
+  const s46Row = hSec(contentW);
+  s46Row.itemSpacing = 32;
+  s46Row.counterAxisAlignItems = "MIN";
+
+  // Left: mini panel — parent SUB=OFF, two descendants locked.
+  const s46Panel = vSec(PANEL_W);
+  s46Panel.cornerRadius = 6;
+  s46Panel.clipsContent = true;
+  setFill(s46Panel, C.panel, 1);
+  setStroke(s46Panel, C.border, 1, 1);
+  s46Panel.itemSpacing = 0;
+  s46Panel.appendChild(columnHeaderBar());
+  s46Panel.appendChild(divider(PANEL_W, C.border, 1));
+  s46Panel.appendChild(row({
+    indent: 0, state: "ok", tree: "expanded",
+    name: "Archive", path: "E:/Projects/FILM/Archive",
+    sub: "off", rel: "off", seq: "off", flt: "off",
+    label: C.labelIris,
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+  }));
+  s46Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s46Panel.appendChild(row({
+    indent: 18, state: "ok", tree: "expanded",
+    name: "2025_Q4", path: "…/Archive/2025_Q4",
+    sub: "inherited-off", rel: "on", seq: "inherited-off", flt: "inherited-off",
+    label: null, labelInherited: true,
+    subLocked: true,
+    actions: [{ glyph: "↻", color: C.text, opacity: 0.35 }, { glyph: "⌕", color: C.text, opacity: 0.35 }, { glyph: "🧲", color: C.text, opacity: 0.35 }, { glyph: "👁", color: C.text, opacity: 0.35 }],
+    rowFill: "alt",
+  }));
+  s46Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s46Panel.appendChild(row({
+    indent: 36, state: "ok", tree: "leaf",
+    name: "shoot_01", path: "…/2025_Q4/shoot_01",
+    sub: "inherited-off", rel: "inherited-on", seq: "inherited-off", flt: "off",
+    label: null, labelInherited: true,
+    subLocked: true,
+    actions: [{ glyph: "↻", color: C.text, opacity: 0.35 }, { glyph: "⌕", color: C.text, opacity: 0.35 }, { glyph: "🧲", color: C.text, opacity: 0.35 }, { glyph: "👁", color: C.text, opacity: 0.35 }],
+  }));
+  s46Row.appendChild(s46Panel);
+
+  // Right: explanation + rationale.
+  const s46Notes = vSec(contentW - PANEL_W - 32);
+  s46Notes.itemSpacing = 12;
+
+  const s46Rule = vSec(contentW - PANEL_W - 32);
+  s46Rule.cornerRadius = 8;
+  setFill(s46Rule, C.panel, 1);
+  setStroke(s46Rule, C.textDim, 0.4, 1);
+  s46Rule.paddingTop = 16; s46Rule.paddingBottom = 16;
+  s46Rule.paddingLeft = 20; s46Rule.paddingRight = 20;
+  s46Rule.itemSpacing = 8;
+  const s46RuleHead = hHug();
+  s46RuleHead.itemSpacing = 10;
+  s46RuleHead.counterAxisAlignItems = "CENTER";
+  const s46Chip = figma.createFrame();
+  s46Chip.resize(6, 6); s46Chip.cornerRadius = 3;
+  setFill(s46Chip, C.textDim, 1);
+  s46RuleHead.appendChild(s46Chip);
+  s46RuleHead.appendChild(txt("Cascade rule", F.s, 12, C.white, undefined, 0.5));
+  s46Rule.appendChild(s46RuleHead);
+  s46Rule.appendChild(txtW(
+    "SUB=OFF on row X ⇒ every descendant keeps its stored SUB/REL/SEQ/FLT value, but each checkbox renders with accent swapped to textDim. " +
+    "Shape preserved (user still sees ON vs OFF vs inherited), color neutralized (control is inactive). " +
+    "NAME + PATH dim to textFade, actions drop to 35% opacity. Click on any locked control → tooltip \"Enable SUB on <X> first\". " +
+    "Flipping X's SUB back on restores accent instantly — nothing to re-enter.",
+    F.r, 12, C.text, contentW - PANEL_W - 72, 18
+  ));
+  s46Notes.appendChild(s46Rule);
+
+  const s46Why = vSec(contentW - PANEL_W - 32);
+  s46Why.cornerRadius = 8;
+  setFill(s46Why, C.panel, 1);
+  setStroke(s46Why, C.accent, 0.4, 1);
+  s46Why.paddingTop = 16; s46Why.paddingBottom = 16;
+  s46Why.paddingLeft = 20; s46Why.paddingRight = 20;
+  s46Why.itemSpacing = 8;
+  const s46WhyHead = hHug();
+  s46WhyHead.itemSpacing = 10;
+  s46WhyHead.counterAxisAlignItems = "CENTER";
+  const s46WhyChip = figma.createFrame();
+  s46WhyChip.resize(6, 6); s46WhyChip.cornerRadius = 3;
+  setFill(s46WhyChip, C.accent, 1);
+  s46WhyHead.appendChild(s46WhyChip);
+  s46WhyHead.appendChild(txt("Decision log — 2026-04-19", F.s, 12, C.white, undefined, 0.5));
+  s46Why.appendChild(s46WhyHead);
+  s46Why.appendChild(txtW(
+    "Why shown-but-disabled (not hidden): user keeps visibility of what would come online if SUB flips back on. " +
+    "Hidden subtree would make re-enabling a leap of faith. Why no separate lock icon: the four greyed checkboxes + dimmed NAME/PATH already carry the signal — adding 🔒 would be visual spam. " +
+    "Why parent stays active: SUB is the SOT, user rules the toggle here; only descendants freeze.",
+    F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
+  ));
+  s46Notes.appendChild(s46Why);
+
+  s46Row.appendChild(s46Notes);
+  s46.appendChild(s46Row);
+  root.appendChild(s46);
 
   // ==================================================
   // SECTION 5 — Sort / reorder — auto-clear on drag (NEW v1.2)
@@ -1652,7 +1895,7 @@ async function main() {
       } else {
         rr.fills = [];
       }
-      rr.appendChild(stateDot(C.success, 1, false));
+      rr.appendChild(labelDot(C.labelCerulean));
       rr.appendChild(txt(rn.replace("→ ", ""), F.m, 10, isDragged ? C.accent : C.text));
       mini.appendChild(rr);
     }
