@@ -316,11 +316,53 @@ CSS: panel — `flex-shrink: 0; overflow-y: auto; max-height: 40vh`. Collapse to
 
 ## 9. Sort / reorder (Q3 — ClickUp pattern)
 
-- **Нет sort modifier** → drag-reorder enabled (юзер тащит row вверх/вниз, сохраняем в JSON `order` field)
-- **Включён хоть один sort** (по name, по path, by state) → drag disabled, rows sortировкой управляется
-- Sort modifier — кнопки/dropdown в column header
+### 9.1. Взаимоисключение sort vs drag
 
-MVP: insertion order (без sort UI). Drag-reorder и sort UI — v1.1.
+- **Нет sort modifier** → drag-reorder enabled. Юзер тащит row вверх/вниз, сохраняем в JSON `ui.order` field. Идеально для ручной группировки ("важные проекты сверху").
+- **Включён хоть один sort** → drag disabled. Rows управляются правилом сортировки, ручной порядок игнорируется пока sort активен. При снятии sort — возвращается сохранённый `ui.order`.
+
+### 9.2. Поля сортировки (MVP)
+
+| Field | Source | Direction | Notes |
+|-------|--------|-----------|-------|
+| **Name** | `folder.name` (display label) | A→Z / Z→A | Primary sort для быстрой навигации |
+| **Date added** | `folder.addedAt` (ISO timestamp, записано SheepDog'ом при `add`) | new→old / old→new | Наш собственный tracking, не filesystem |
+| **Path** | `folder.path` (resolved abs) | A→Z / Z→A | Для юзеров, которые мыслят в file tree terms |
+| **State** | computed STATE dot (§3.1) | problems first / ok first | Триаж: "где красное?" — одним кликом всё проблемное сверху |
+
+**Date added — откуда берём:**
+- **SheepDog-owned** (`folder.addedAt` в JSON) — timestamp момента, когда юзер добавил папку в панель (кликнул + Add / drag-drop / нашли при migration). **Используем это** как primary.
+- **FS-owned** (`fs.statSync(path).birthtime`) — время создания папки на диске. Менее надёжно (кросс-платформенно шатко: на Linux `birthtime` может быть `0`, на переносе через cloud timestamp обновляется), семантически не то что ждёт юзер. **Не используем.**
+
+Best practice: наше `addedAt` — SOT, FS — ignored для сортировки.
+
+### 9.3. UI — как сортировать
+
+- **Click на column header** → sort by this column ascending. Second click → descending. Third click → remove sort (вернуться к manual `ui.order`).
+- **Активный sort indicator** в header: стрелка `↑` / `↓` рядом с именем колонки, подсветка accent цветом.
+- **Multi-sort** (shift-click на второй column) — v1.1, не MVP. В MVP один sort field за раз.
+- **Sort persists** per session. Сохранять в JSON `ui.activeSort: {field, direction}` — чтобы при reopen панели сохранился последний выбор (как в Finder / VSC Explorer).
+
+### 9.4. Tree interaction with sort
+
+Важный edge case: дерево иерархическое. Sort применяется **per level** (siblings сортируются, но parent-child связь не ломается):
+
+```
+[Sort by Name A→Z]
+├─ 01_Assets         (sibling, sorted)
+│   ├─ 01_Video      (child of 01_Assets, sorted within)
+│   └─ 02_Image
+├─ 02_Stills         (sibling, sorted)
+└─ 03_Archive
+```
+
+Sort **не делает flat list** — tree structure сохраняется всегда. Это и есть поведение Finder's "Arrange by → Name".
+
+### 9.5. Roadmap
+
+- **MVP:** insertion order (без sort UI, без drag). Просто список в порядке добавления.
+- **v1.1:** drag-reorder + 1-field sort (Name, Date added, Path, State) + indicators в column headers.
+- **v1.2:** multi-sort (shift-click chain), custom sort groups (by label color), saved sort presets.
 
 ---
 
@@ -337,6 +379,7 @@ MVP: insertion order (без sort UI). Drag-reorder и sort UI — v1.1.
       "name": "day1",             // display name (editable)
       "targetBin": "day1",
       "parentId": null,           // null = root row, "xyz" = child of row xyz
+      "addedAt": "2026-04-19T14:22:03Z",  // ISO timestamp — sort key for "Date added"
       "enabled": true,
       "sub": true,                // was "subfolders"
       "flatten": false,
@@ -346,13 +389,14 @@ MVP: insertion order (без sort UI). Drag-reorder и sort UI — v1.1.
       "mirrorDel": false,         // DEL (hidden unless danger zone on)
       "ui": {
         "expanded": true,
-        "order": 0
+        "order": 0                // manual drag-reorder position (ignored when activeSort set)
       }
     }
   ],
   "settings": {
     "dangerZoneEnabled": false,
-    "showPerFolderDel": false
+    "showPerFolderDel": false,
+    "activeSort": null            // null | {field:"name"|"addedAt"|"path"|"state", direction:"asc"|"desc"}
   }
 }
 ```
@@ -361,6 +405,7 @@ MVP: insertion order (без sort UI). Drag-reorder и sort UI — v1.1.
 
 - Existing `subfolders` field → rename to `sub`
 - Missing fields defaulted: `pathMode="abs"`, `parentId=null`, `sequences=false`, `label=null`, `autoWatch=true`, `ui.expanded=true`
+- **`addedAt`** defaulted к `fs.statSync(configPath).mtime` (время последней записи config) для уже существующих rows — не идеально, но единственный доступный fallback. Новые rows пишут реальный timestamp при `add`
 - Write backup to `.bak` before migrating (FolderManager уже делает это)
 
 ### 10.2. Lazy child rows
