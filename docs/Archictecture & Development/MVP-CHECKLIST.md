@@ -744,6 +744,45 @@ chunk = 1. ProRes 10GB — chunk = 1 (floor), duration будет большая
 > - [ ] Проверить Bridge.diagnose() перед Sync All: все ли компоненты ok
 > - [ ] Если repro найден → fix → закрыть баг
 
+## BUG-002: Re-add watch folder fails silently after mogrt-placeholder + bin delete cycle
+
+> Обнаружен и **детерминированно воспроизведён** 2026-04-19.
+>
+> **Repro (deterministic):**
+> 1. В проекте есть placeholder внутри `.mogrt`, ссылающийся на файл из watched folder
+> 2. Проект Premiere **открыт, но в фоне** (не активное окно)
+> 3. Удаляем bin этой watch folder в Premiere вручную
+> 4. Удаляем ту же watch folder из панели SheepDog
+> 5. Пытаемся снова добавить тот же watch folder в SheepDog
+>
+> **Симптомы:**
+> - WF не сохраняется повторно (add тихо фейлится)
+> - Premiere **считает сессию как краш**, но **визуально не крашится** — UI отзывчив
+> - SheepDog не может импортировать файлы в повторно добавленную WF
+> - Файл, который был в placeholder'е `.mogrt`, **скрытно перемещается** в recovery folder
+> - Recovery folder появляется **при следующем перезапуске Premiere**
+>
+> **Hypothesis root cause:** Premiere держит project в некорректном internal state когда:
+> (a) проект в background (окно не активно) — возможно меняется lifecycle обработки commands
+> (b) был item в bin, ссылающийся на placeholder в open `.mogrt`
+> (c) bin удалён до того как placeholder resolved/cleaned
+>
+> ExtendScript calls на такой проект идут в «pending» состояние, не durable до рестарта. Повторный `importFiles(...)` на тот же путь воспринимается как conflict с pending state → silent reject.
+>
+> Связь с `.mogrt` placeholder — ключевой фактор: без него цикл delete bin → re-add WF работает чисто. Placeholder удерживает reference на файл даже после delete bin, создавая orphaned pending op.
+>
+> **Решать не нужно (сейчас).** Зафиксирован как known issue. Ждём §23 (Dev Observability), чтобы снять timeline событий при repro.
+>
+> **TODO (после §23):**
+> - [ ] Повторить deterministic repro при live dev logger → собрать dump
+> - [ ] Перед каждым шагом читать `app.project.documentID`, `app.project.isDirty` — ловим момент где state ломается
+> - [ ] Проверить содержимое recovery folder после перезапуска — куда именно уходит файл
+> - [ ] Проверить, спасёт ли принудительный `app.project.save()` между шагами 3 и 4
+> - [ ] Проверить, решает ли проблему pre-check на open `.mogrt` c placeholder'ами перед remove WF (показать warning юзеру)
+> - [ ] Возможно связано с BUG-001 (оба про stuck state Premiere после определённой sequence)
+>
+> **Workaround для юзера:** перед удалением bin и WF убедиться, что все `.mogrt` с placeholder'ами закрыты / removed / resolved. Если уже попали в это состояние — рестарт Premiere.
+
 ---
 
 # REJECTED / DEFERRED

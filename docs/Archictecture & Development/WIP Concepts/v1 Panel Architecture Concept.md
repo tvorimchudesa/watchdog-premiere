@@ -160,21 +160,51 @@
 
 **Safety cover на SUB**: **да**. Не от удаления файлов (мы их не удаляем — см. 5.5), а от silent miss. Юзер случайно выключил SUB у `Day 02`, съёмка продолжается, файлы не попадают — через 3 часа замечает. Cover + timer = "подумай, ты точно хочешь остановить захват subfolders?"
 
-### 5.2. FLT (flatten into own bin) — resolved (β)
+### 5.2. FLT (flatten into own bin) — v2 semantics (resolved 2026-04-19)
 
-Сценарий: parent `03_Assets` FLT=ON, child `01_Video` FLT=OFF (override).
+**FLT=ON на row означает:** эта row **не имеет собственного bin**. Её файлы всплывают в bin ближайшего row-предка с `FLT=OFF`.
 
-**Выбрана модель (β): child gets sub-bin внутри parent bin как exception.**
+**Правило резолва target bin для файла:**
+1. Файл лежит в `diskPath` внутри какой-то watched папки (row или virtual)
+2. Находим ближайший row-предок (включая саму row, если она не FLT=ON) с `FLT=OFF`
+3. Файл идёт в bin этого предка
 
-- `03_Assets` сохраняет Bin structure disk → project (плоский для direct files parent'а)
-- `01_Video` остаётся sub-bin **внутри** `03_Assets` bin (because disk structure: `03_Assets/01_Video/`)
-- Внутри `01_Video` bin'а сохраняется его собственная структура subfolders (child FLT=OFF)
+**Важно:** FLT — **caskad по дереву rows**, не row-local. Если цепочка `Footage(OFF) → day1(ON) → RAW(OFF)`, то:
 
-**Правило:** FLT — **row-local**. Управляет структурой **своего** bin контента, не тянется сквозь child rows.
+| File | Nearest FLT=OFF ancestor | Lands in bin |
+|------|--------------------------|--------------|
+| `Footage/x.mp4` | Footage | Footage |
+| `Footage/day1/y.mp4` | Footage (day1 flat) | Footage |
+| `Footage/day1/RAW/z.mxf` | RAW | RAW (nested in Footage) |
 
-Альтернатива (α): child уходит в root проекта — отвергнута. Теряется визуальная связь с parent, 1:1 disk→project ломается, хаос при 5+ overrides.
+**Обратный override:**
+- `Footage(OFF) → day1(OFF) → RAW(ON)` → файлы из RAW поднимаются в day1 bin, RAW собственный bin не создаёт.
 
-**Safety cover на FLT**: **да**. Flatten и unflatten перемещают файлы (moveBin). Timeline references не ломаются (API сохраняет ссылки), но bin structure в проекте перестраивается дерзко. Cover + таймер предотвращает fat finger.
+**Миграция при toggle FLT:** уже-импортированные файлы перемещаются (`moveItem`) между bin'ами автоматически. Timeline references не ломаются — API сохраняет ссылки на file source, bin location не структурна, это UI-представление. Опустевший bin удаляется.
+
+**Почему не v1 (row-local, child всегда gets own sub-bin):**
+v1 давал гарантию «1 watch-row = 1 bin», проще ментально. Но на глубоких деревьях (`Footage/day1/morning/cam_A/`) принуждал к nested bin'ам, даже если юзер просит flat asset pool. v2 позволяет держать tree в UI (навигация, overrides) и одновременно flat в Premiere bins. Отвергнутая v1 — см. decision log в §5.2.2.
+
+**Safety cover на FLT**: **да**. Toggle = массовое перемещение items. Cover + таймер + счётчик файлов (см. §5.2.1 guard 5) предотвращают fat finger.
+
+### 5.2.1. UI guards для FLT (обязательны для v2)
+
+Каскад детерминирован, но ментально нетривиален. Без guards юзер будет искать «где мой bin для day1». Нужно:
+
+1. **Effective target preview в row.** У `FLT=ON` row показать резолвленный target: `→ Footage` (имя ближайшего не-flat предка) рядом с NAME или в отдельном sub-слоте. Без этого ряд выглядит «пустым» в плане назначения.
+
+2. **Hover tooltip с target.** Наведение на любую row → `Files land in: [bin name]` (с breadcrumb'ом если target — sub-bin).
+
+3. **«Show effective targets» toggle в header.** Кнопка-переключатель рядом с Sort: включил → у каждой row подсвечивается резолвленный target bin. Debug/audit режим для «почему мои клипы не там, где я жду».
+
+4. **STATE dot учитывает FLT=ON row без bin'а.** Row с `FLT=ON` by definition не имеет собственного bin — для неё нельзя показывать `bin missing` warning. STATE резолвится по эффективному bin'у предка: bin предка OK → ряд зелёный; bin предка потерян → ряд красный по наследству. Tooltip на dot: *«No own bin (flat). Inherits state from Footage bin.»*
+
+5. **Migration хинт при toggle FLT.** Safety cover кроме таймера показывает счётчик: *«12 файлов будут перемещены из `day1` bin в `Footage` bin. Таймлайны не пострадают.»* Юзер видит масштаб до подтверждения.
+
+### 5.2.2. Decision log
+
+- **2026-04-19** — выбрана v2 (caskad). Обсуждение: v1 давал предсказуемость `1 row = 1 bin`, но ломал сценарий «глубокое дерево → плоский bin pool». v2 выигрывает на реальных проектах, риски (invisible bin, unclear target) закрыты UI-guards §5.2.1.
+- **Отвергнуто в v2:** row-local модель (β из предыдущей версии концепта) — слишком жёсткая для сложных деревьев.
 
 ### 5.3. REL (relative path storage)
 
@@ -217,7 +247,7 @@
 | Control | Cover? | Reason |
 |---------|--------|--------|
 | SUB | Yes | silent miss — перестаёт захватывать, юзер не замечает |
-| FLT | Yes | reorganizes bin structure — fat finger можно откатить, но раздражает |
+| FLT | Yes | массово перемещает items между bin'ами (caskad v2); счётчик «N файлов будут перемещены» в cover — см. §5.2.1 guard 5 |
 | DEL (hidden) | Yes | destructive mirror-delete |
 | Gather Sheep (🧲) | Yes | массово передвигает bins в проекте |
 | Remove row (×) | Plain confirm modal | destructive при active auto-sync, проще диалогом |
@@ -316,10 +346,26 @@ CSS: panel — `flex-shrink: 0; overflow-y: auto; max-height: 40vh`. Collapse to
 
 ## 9. Sort / reorder (Q3 — ClickUp pattern)
 
-### 9.1. Взаимоисключение sort vs drag
+### 9.1. Sort vs drag — авто-переключение (resolved 2026-04-19)
 
-- **Нет sort modifier** → drag-reorder enabled. Юзер тащит row вверх/вниз, сохраняем в JSON `ui.order` field. Идеально для ручной группировки ("важные проекты сверху").
-- **Включён хоть один sort** → drag disabled. Rows управляются правилом сортировки, ручной порядок игнорируется пока sort активен. При снятии sort — возвращается сохранённый `ui.order`.
+**Правило:** как только юзер начинает drag row (mousedown + перемещение > threshold), активный sort **снимается автоматически**, а текущий визуальный порядок замораживается как новый baseline `ui.order`. Drag продолжается в этом baseline.
+
+**Поток:**
+1. Список отрисован с активным `Sort by: Name ↑`
+2. Юзер начинает тащить row 3 → sort auto-clears
+3. Отображаемый порядок (Name ↑) записывается в `ui.order` всех siblings того же уровня
+4. Drag завершается — row оказывается на новой позиции, остальной порядок = как был при sort'е
+5. **Micro-toast**: *«Sort cleared → manual order active»* (3–5s, fade)
+
+**Почему так:**
+- **Single-gesture UX** — не надо «сначала снять sort, потом drag». Юзер тянет, сортировка уходит сама
+- **Порядок не рушится в хаос** — сохраняется то, что юзер видел на экране в момент drag'а
+- **Pattern** из Finder / Notion / ClickUp — знаком всем
+
+**Guards:**
+- Micro-toast **обязателен** — без него юзер может не понять, почему sort-индикатор в header вдруг пропал. Toast однократный на drag gesture, auto-dismiss.
+- Threshold для старта drag'а — минимум 4-5px движения, чтобы случайный mousedown на row не снимал sort.
+- Откат: в первые 3s после clear показывать в toast'е кнопку `Undo` → возвращает sort и исходный `ui.order`.
 
 ### 9.2. Поля сортировки (MVP)
 
