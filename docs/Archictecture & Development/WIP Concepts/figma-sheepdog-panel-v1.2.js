@@ -25,8 +25,27 @@
 //     descendant controls (SUB/REL/SEQ/FLT) rendered as inherited-off,
 //     NAME/PATH dimmed to textFade. row() supports cfg.subLocked that cascades
 //     the dim. Parent keeps its SUB checkbox active (SOT, toggleable).
+//   - §4.7 NEW (2026-04-20): DEL column. Danger-zone opt-in, never inherits,
+//     safety cover on first click. checkbox() gains 3rd param `danger` that
+//     swaps accent to C.danger. columnHeaderBar({showDel:true}) + row({showDel
+//     :true,del:...}) conditionally insert DEL between FLT and ACTIONS. Red
+//     reserved for activation signals only — filled on-state + `cover-armed`
+//     countdown. Column header and calm states render identically to other
+//     columns (no red backdrop, no red label). Settings → Danger zone preview
+//     keeps a red border as the gate-warning signal (outside the column).
 //   - §5 sort/reorder: replaced binary "drag enabled/disabled" with the
 //     auto-clear-on-drag flow + micro-toast with Undo
+//   - §7 NEW (2026-04-20): Settings panel — modal overlay. Canonical store
+//     for every global flag; header toggles are shortcuts to the same
+//     state. Five sections: General (incl. New watch folder defaults as a
+//     row of 8 big-checkbox cells), Import filters (Allowlist / Denylist
+//     + orthogonal Skip hidden/service files), Behavior (cover / undo /
+//     writeFinish durations), Danger zone (Enable DEL column, red border),
+//     Advanced / Logs (Save log, Dump now migrated here). Introduces
+//     globalOverride visual: when global Auto Sync = ON, per-row 👁
+//     renders at opacity 0.4 (dormant — state preserved, editable, but
+//     currently not in effect). Distinct from subLocked (color-swap):
+//     opacity-reduce ≠ color-swap = two axes, two meanings.
 
 async function main() {
   // ---------- Fonts ----------
@@ -51,6 +70,7 @@ async function main() {
     REL: 32,
     SEQ: 32,
     FLT: 32,
+    DEL: 32,   // hidden by default; appears only when Settings → Danger zone enables it
     ACT: 118,
     RM: 22,
   };
@@ -194,17 +214,24 @@ async function main() {
     return f;
   }
 
-  // checkbox(variant, locked?) — when locked=true, semantic shape is preserved
-  // (on/off/inherited-on/inherited-off) but accent color swaps to textDim so
-  // the control reads "currently inactive, stored value will come back when
-  // the lock lifts". Used for SUB=OFF subtree lockout on descendants.
-  function checkbox(variant, locked) {
+  // checkbox(variant, locked?, danger?)
+  //   locked=true → semantic shape preserved (on/off/inherited-on/inherited-off)
+  //     but accent color swaps to textDim (SUB=OFF subtree lockout on descendants).
+  //   danger=true → red ONLY on activation signals (filled on-state + lifted
+  //     cover countdown). Calm states (off, inherited-off, disabled) render
+  //     identically to non-danger columns — column header also stays neutral.
+  //     Rationale: red everywhere would desensitize. The danger signal fires
+  //     only when the control is actually being used. Locked always wins
+  //     over danger (inactive cell is neutral, not red).
+  function checkbox(variant, locked, danger) {
     const f = figma.createFrame();
     f.resize(14, 14);
     f.cornerRadius = 3;
-    const tint = locked ? C.textDim : C.accent;
+    const baseAccent = danger ? C.danger : C.accent;
+    const tint = locked ? C.textDim : baseAccent;
     const markColor = locked ? { r: 0.75, g: 0.75, b: 0.77 } : C.white;
     if (variant === "on") {
+      // Active signal — red fill + red stroke in danger mode.
       setFill(f, tint, locked ? 0.55 : 1);
       setStroke(f, tint, locked ? 0.7 : 1, 1);
       f.layoutMode = "HORIZONTAL";
@@ -214,6 +241,7 @@ async function main() {
       f.counterAxisAlignItems = "CENTER";
       f.appendChild(txt("✓", F.b, 10, markColor));
     } else if (variant === "off") {
+      // Calm state — identical to non-danger, no red hint.
       f.fills = [];
       setStroke(f, locked ? C.textFade : C.borderStrong, locked ? 0.65 : 1, 1);
     } else if (variant === "inherited-on") {
@@ -226,13 +254,19 @@ async function main() {
       f.counterAxisAlignItems = "CENTER";
       f.appendChild(txt("✓", F.m, 9, markColor));
     } else if (variant === "inherited-off") {
+      // Calm state — identical to non-danger.
       f.fills = [];
       setStroke(f, locked ? C.textFade : C.borderStrong, locked ? 0.3 : 0.45, 1);
     } else if (variant === "cover") {
-      // Covered checkbox — matte fill = literal flip-up cover down.
-      // Slightly thicker gray stroke. No iconography.
+      // Cover down = calm (matte gray, same as other columns).
+      // Cover lifted / countdown running is a separate variant — see "cover-armed".
       setFill(f, C.white, 0.06);
       setStroke(f, C.borderStrong, 1, 1.5);
+    } else if (variant === "cover-armed") {
+      // DEL-specific: cover lifted, ~3s countdown running. Red stroke is
+      // the signal "destructive commit imminent". Second click commits → "on".
+      setFill(f, C.white, 0.06);
+      setStroke(f, C.danger, 0.85, 1.5);
     } else if (variant === "disabled") {
       f.fills = [];
       setStroke(f, C.textFade, 0.5, 1);
@@ -431,6 +465,13 @@ async function main() {
     r.appendChild(cell(COL.REL, checkbox(cfg.rel, cfg.subLocked)));
     r.appendChild(cell(COL.SEQ, checkbox(cfg.seq, cfg.subLocked)));
     r.appendChild(cell(COL.FLT, checkbox(cfg.flt, cfg.subLocked)));
+    if (cfg.showDel) {
+      // DEL cell — transparent bg. Danger palette applied via `danger=true`
+      // on checkbox, but red ONLY renders on activation signals (on-state +
+      // cover-armed countdown). Calm states identical to other columns.
+      const delVariant = cfg.del || "off";
+      r.appendChild(cell(COL.DEL, checkbox(delVariant, cfg.subLocked, true)));
+    }
 
     const actWrap = cell(COL.ACT, null, "MIN");
     const actInner = hHug();
@@ -483,6 +524,11 @@ async function main() {
     wrap.appendChild(colHeaderCell(COL.REL, "REL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.SEQ, "SEQ", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.FLT, "FLT", "CENTER"));
+    if (opts && opts.showDel) {
+      // DEL header — neutral, identical to other columns. The red signal
+      // is reserved for the checkbox itself (on-state + cover-armed).
+      wrap.appendChild(colHeaderCell(COL.DEL, "DEL", "CENTER"));
+    }
     wrap.appendChild(colHeaderCell(COL.ACT, "ACTIONS", "MIN"));
     wrap.appendChild(colHeaderCell(COL.RM, "", "CENTER"));
     return wrap;
@@ -749,7 +795,7 @@ async function main() {
   const titleSec = vSec(contentW);
   titleSec.itemSpacing = 8;
   titleSec.appendChild(txt("SheepDog — Panel v1.2 Concept", F.b, 36, C.white, 44, 1));
-  titleSec.appendChild(txt("STATE → row-bg tint · LBL leftmost · FLT flat-override · FLT border states · SUB=OFF subtree lockout · sort auto-clear on drag · 2026-04-19", F.r, 14, C.textDim, 20));
+  titleSec.appendChild(txt("STATE → row-bg tint · LBL leftmost · FLT flat-override · FLT border states · SUB=OFF subtree lockout · DEL danger-zone opt-in · sort auto-clear on drag · 2026-04-20", F.r, 14, C.textDim, 20));
   titleSec.appendChild(divider(contentW, C.white, 0.08));
   root.appendChild(titleSec);
 
@@ -1805,6 +1851,188 @@ async function main() {
   root.appendChild(s46);
 
   // ==================================================
+  // SECTION 4.7 — DEL column — danger-zone opt-in (NEW v1.2)
+  //   Per-row destructive toggle. Hidden by default. Enabled via
+  //   Settings → Danger zone. Never inherits. Safety cover on first click.
+  //   Red palette restricted to activation signals: filled on-state + the
+  //   cover-armed countdown. Column header, off/inherited-off/disabled and
+  //   cover-down all render identically to other columns — no red backdrop,
+  //   no red header. Settings → Danger zone preview (outside the column)
+  //   keeps a red border as the gate-warning signal.
+  // ==================================================
+  const s47 = vSec(contentW);
+  s47.itemSpacing = 16;
+  s47.appendChild(sectionTitle(
+    "4.7 DEL column — danger-zone opt-in (resolved 2026-04-20)",
+    "Bidirectional delete. Hidden by default. Settings → Danger zone enables the column. Never inherits — every row opts in explicitly. Safety cover on first click. Red fires only on activation signals (on-state + cover-armed countdown); calm states stay neutral.",
+    contentW
+  ));
+
+  const s47Row = hSec(contentW);
+  s47Row.itemSpacing = 32;
+  s47Row.counterAxisAlignItems = "MIN";
+
+  // Left: mini panel with DEL column ENABLED (showDel: true on header + rows).
+  const s47Panel = vSec(PANEL_W);
+  s47Panel.cornerRadius = 6;
+  s47Panel.clipsContent = true;
+  setFill(s47Panel, C.panel, 1);
+  setStroke(s47Panel, C.border, 1, 1);
+  s47Panel.itemSpacing = 0;
+  s47Panel.appendChild(columnHeaderBar({ showDel: true }));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 1));
+
+  // Row A — default: DEL=off (never inherited, empty w/ subtle red stroke)
+  s47Panel.appendChild(row({
+    indent: 0, state: "ok", tree: "collapsed",
+    name: "footage", path: "E:/Projects/FILM/footage",
+    sub: "on", rel: "off", seq: "on", flt: "off",
+    showDel: true, del: "off",
+    label: C.labelForest,
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+  }));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+
+  // Row B — DEL=on (red filled checkbox)
+  s47Panel.appendChild(row({
+    indent: 0, state: "ok", tree: "collapsed",
+    name: "reelA", path: "D:/Shoots/2026/reelA",
+    sub: "on", rel: "off", seq: "on", flt: "off",
+    showDel: true, del: "on",
+    label: C.labelMango,
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+    rowFill: "alt",
+  }));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+
+  // Row C — DEL=cover-armed (user clicked once, cover lifted, red countdown ~3s)
+  s47Panel.appendChild(row({
+    indent: 0, state: "ok", tree: "collapsed",
+    name: "reelB", path: "D:/Shoots/2026/reelB",
+    sub: "on", rel: "off", seq: "on", flt: "off",
+    showDel: true, del: "cover-armed",
+    label: C.labelRose,
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+  }));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+
+  // Row D — DEL=on but subLocked (locked wins over danger → textDim, not red)
+  s47Panel.appendChild(row({
+    indent: 0, state: "ok", tree: "leaf",
+    name: "reelC", path: "…/Archive/reelC",
+    sub: "inherited-off", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off",
+    showDel: true, del: "on",
+    subLocked: true,
+    label: null, labelInherited: true,
+    actions: [{ glyph: "↻", color: C.text, opacity: 0.35 }, { glyph: "⌕", color: C.text, opacity: 0.35 }, { glyph: "🧲", color: C.text, opacity: 0.35 }, { glyph: "👁", color: C.text, opacity: 0.35 }],
+    rowFill: "alt",
+  }));
+
+  s47Row.appendChild(s47Panel);
+
+  // Right column — rules + decision log + Settings-hint preview.
+  const s47Notes = vSec(contentW - PANEL_W - 32);
+  s47Notes.itemSpacing = 12;
+
+  // Rules card
+  const s47Rules = vSec(contentW - PANEL_W - 32);
+  s47Rules.cornerRadius = 8;
+  setFill(s47Rules, C.panel, 1);
+  setStroke(s47Rules, C.danger, 0.4, 1);
+  s47Rules.paddingTop = 16; s47Rules.paddingBottom = 16;
+  s47Rules.paddingLeft = 20; s47Rules.paddingRight = 20;
+  s47Rules.itemSpacing = 8;
+  const s47RulesHead = hHug();
+  s47RulesHead.itemSpacing = 10;
+  s47RulesHead.counterAxisAlignItems = "CENTER";
+  const s47RulesDot = figma.createFrame();
+  s47RulesDot.resize(6, 6); s47RulesDot.cornerRadius = 3;
+  setFill(s47RulesDot, C.danger, 1);
+  s47RulesHead.appendChild(s47RulesDot);
+  s47RulesHead.appendChild(txt("DEL rules", F.s, 12, C.white, undefined, 0.5));
+  s47Rules.appendChild(s47RulesHead);
+
+  const s47RulesBullets = [
+    "Hidden by default. Appears only when Settings → Danger zone → \"Enable DEL column\" is on.",
+    "Calm states (off / header / inherited) render identically to other columns — no red backdrop, no red label. Red only fires on activation.",
+    "Never inherits. Every row opts in explicitly. No cascade from parent. Default for new rows = off.",
+    "Safety cover on first click → cover lifts, stroke turns red, ~3s countdown. Second click commits. Timeout re-locks.",
+    "Active commit state (✓) renders red fill + red stroke — persistent danger signal until unchecked.",
+    "Bidirectional sync: bin delete → source files moved to OS trash. Source folder deleted in OS → bin purged in Premiere.",
+    "Premiere guard: a bin with clips in active use will not purge — SheepDog reports \"Skipped, N clips in use\" and highlights the offending rows amber.",
+    "Soft delete only — files go to OS trash (Windows 48 h recovery window); never a hard unlink.",
+    "SUB=OFF lockout applies. Locked DEL shows the stored value in textDim (same rule as SUB/REL/SEQ/FLT).",
+    "Undo toast — 10 s window to reverse the last commit before the trash entry becomes the only recovery path.",
+  ];
+  for (const line of s47RulesBullets) {
+    const row = hSec(contentW - PANEL_W - 72);
+    row.itemSpacing = 8;
+    row.counterAxisAlignItems = "MIN";
+    row.appendChild(txt("•", F.b, 12, C.danger));
+    row.appendChild(txtW(line, F.r, 11, C.text, contentW - PANEL_W - 96, 16));
+    s47Rules.appendChild(row);
+  }
+  s47Notes.appendChild(s47Rules);
+
+  // Decision log — why this is safe
+  const s47Why = vSec(contentW - PANEL_W - 32);
+  s47Why.cornerRadius = 8;
+  setFill(s47Why, C.panel, 1);
+  setStroke(s47Why, C.accent, 0.4, 1);
+  s47Why.paddingTop = 16; s47Why.paddingBottom = 16;
+  s47Why.paddingLeft = 20; s47Why.paddingRight = 20;
+  s47Why.itemSpacing = 8;
+  const s47WhyHead = hHug();
+  s47WhyHead.itemSpacing = 10;
+  s47WhyHead.counterAxisAlignItems = "CENTER";
+  const s47WhyDot = figma.createFrame();
+  s47WhyDot.resize(6, 6); s47WhyDot.cornerRadius = 3;
+  setFill(s47WhyDot, C.accent, 1);
+  s47WhyHead.appendChild(s47WhyDot);
+  s47WhyHead.appendChild(txt("Decision log — 2026-04-20", F.s, 12, C.white, undefined, 0.5));
+  s47Why.appendChild(s47WhyHead);
+  s47Why.appendChild(txtW(
+    "Two-gate destroy: the user passes Settings → Danger zone (read the warning, flip the toggle) AND then per-row safety cover. Column only appears after gate 1 — the mere presence of the header is a meaningful signal on its own, no red backdrop needed. " +
+    "Red reserved for activation signals only: filled on-state + cover-armed countdown. Column header, off, inherited-off, disabled and cover-down render identically to other columns — a red everywhere scheme would desensitize, and the danger should read as \"something is about to happen / is currently armed\", not \"this column exists\". " +
+    "Settings → Danger zone preview keeps a red border because it sits OUTSIDE the column and IS the warning gate itself. Locked wins over danger: SUB=OFF cascade still tints the stored DEL value in textDim (user call, 2026-04-20). " +
+    "Trash-first (not hard delete) keeps data integrity (P0); Premiere's own \"clip in use\" guard gives a second natural belt.",
+    F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
+  ));
+  s47Notes.appendChild(s47Why);
+
+  // Settings-hint preview — mini mock of where the toggle lives.
+  const s47Hint = vSec(contentW - PANEL_W - 32);
+  s47Hint.cornerRadius = 8;
+  setFill(s47Hint, C.canvas, 1);
+  setStroke(s47Hint, C.danger, 0.5, 1);
+  s47Hint.paddingTop = 14; s47Hint.paddingBottom = 14;
+  s47Hint.paddingLeft = 16; s47Hint.paddingRight = 16;
+  s47Hint.itemSpacing = 10;
+  const s47HintHead = hHug();
+  s47HintHead.itemSpacing = 8;
+  s47HintHead.counterAxisAlignItems = "CENTER";
+  s47HintHead.appendChild(txt("⚠", F.b, 12, C.danger));
+  s47HintHead.appendChild(txt("Settings  →  Danger zone", F.s, 11, C.danger, undefined, 0.6));
+  s47Hint.appendChild(s47HintHead);
+
+  const s47HintToggleRow = hSec(contentW - PANEL_W - 32 - 32);
+  s47HintToggleRow.itemSpacing = 10;
+  s47HintToggleRow.counterAxisAlignItems = "CENTER";
+  s47HintToggleRow.appendChild(toggle(true));
+  const s47HintLblWrap = vHug();
+  s47HintLblWrap.itemSpacing = 2;
+  s47HintLblWrap.appendChild(txt("Enable DEL column", F.m, 12, C.text));
+  s47HintLblWrap.appendChild(txt("Per-row destructive toggle. Red only on active DEL + cover countdown. Safety cover on first click.", F.r, 10, C.textDim, 14));
+  s47HintToggleRow.appendChild(s47HintLblWrap);
+  s47Hint.appendChild(s47HintToggleRow);
+
+  s47Notes.appendChild(s47Hint);
+
+  s47Row.appendChild(s47Notes);
+  s47.appendChild(s47Row);
+  root.appendChild(s47);
+
+  // ==================================================
   // SECTION 5 — Sort / reorder — auto-clear on drag (NEW v1.2)
   // ==================================================
   const s5 = vSec(contentW);
@@ -2136,6 +2364,527 @@ async function main() {
   s6.appendChild(s6Row);
   s6.appendChild(s6Row2);
   root.appendChild(s6);
+
+  // ==================================================
+  // SECTION 7 — Settings panel — modal overlay (NEW v1.2)
+  //   Full-screen modal. Canonical source for all global config.
+  //   Header-bar toggles (Auto Sync, Show targets) are shortcuts that
+  //   flip the same underlying state — they are NOT independent truth.
+  //   Five sections: General · Import filters · Behavior · Danger zone
+  //   · Advanced. Save/Cancel footer.
+  //
+  //   globalOverride mechanism — NEW: when global Auto Sync = ON, per-row
+  //   👁 renders at opacity 0.4 (dormant — state preserved and still
+  //   editable, but currently not in effect). Distinction from subLocked:
+  //   subLocked uses color-swap (fill → textDim) meaning "you can't change
+  //   this." globalOverride uses opacity-reduce on the native accent
+  //   meaning "you can still change it, it just doesn't apply right now."
+  //   Different mechanisms → different meanings. Stacked = doubly dormant.
+  // ==================================================
+  const s7 = vSec(contentW);
+  s7.itemSpacing = 16;
+  s7.appendChild(sectionTitle(
+    "7. Settings panel — modal overlay, canonical config",
+    "Full-panel overlay (not a drawer, not a tab). Five sections. All global state lives here; header toggles are shortcuts pointing at the same store. Global Auto Sync = ON dims per-row 👁 to opacity 0.4 (dormant) — opacity-reduce ≠ color-swap, so it reads distinctly from subLocked.",
+    contentW
+  ));
+
+  const s7Row = hSec(contentW);
+  s7Row.itemSpacing = 32;
+  s7Row.counterAxisAlignItems = "MIN";
+
+  // ===== Local helpers — scoped to §7 =====
+  function settingsSection(title) {
+    const sec = vSec(PANEL_W);
+    sec.paddingLeft = 20; sec.paddingRight = 20;
+    sec.paddingTop = 18; sec.paddingBottom = 18;
+    sec.itemSpacing = 14;
+    sec.appendChild(txt(title, F.s, 12, C.white, undefined, 0.4));
+    return sec;
+  }
+  function settingsRow(labelTxt, subTxt, control) {
+    const rw = hSec(PANEL_W - 40);
+    rw.itemSpacing = 12;
+    rw.counterAxisAlignItems = "CENTER";
+    rw.primaryAxisAlignItems = "SPACE_BETWEEN";
+    const lblWrap = vHug();
+    lblWrap.itemSpacing = 2;
+    lblWrap.appendChild(txt(labelTxt, F.m, 12, C.text));
+    if (subTxt) lblWrap.appendChild(txtW(subTxt, F.r, 10, C.textDim, PANEL_W - 160, 14));
+    rw.appendChild(lblWrap);
+    rw.appendChild(control);
+    return rw;
+  }
+  // New watch folder defaults — big checkbox cell with column label below
+  function defaultsCell(label, isOn, color) {
+    const col = vHug();
+    col.itemSpacing = 6;
+    col.counterAxisAlignItems = "CENTER";
+    const box = figma.createFrame();
+    box.resize(26, 26);
+    box.cornerRadius = 4;
+    box.layoutMode = "HORIZONTAL";
+    box.layoutSizingHorizontal = "FIXED";
+    box.layoutSizingVertical = "FIXED";
+    box.primaryAxisAlignItems = "CENTER";
+    box.counterAxisAlignItems = "CENTER";
+    if (isOn) {
+      setFill(box, color || C.accent, 1);
+      setStroke(box, color || C.accent, 1, 1);
+      box.appendChild(txt("✓", F.b, 14, C.white));
+    } else {
+      box.fills = [];
+      setStroke(box, C.borderStrong, 1, 1);
+    }
+    col.appendChild(box);
+    col.appendChild(txt(label, F.s, 9, isOn ? C.text : C.textDim, undefined, 0.8));
+    return col;
+  }
+  function radio(isOn) {
+    const f = figma.createFrame();
+    f.resize(14, 14);
+    f.cornerRadius = 7;
+    f.fills = [];
+    setStroke(f, isOn ? C.accent : C.borderStrong, 1, 1);
+    if (isOn) {
+      f.layoutMode = "HORIZONTAL";
+      f.layoutSizingHorizontal = "FIXED";
+      f.layoutSizingVertical = "FIXED";
+      f.primaryAxisAlignItems = "CENTER";
+      f.counterAxisAlignItems = "CENTER";
+      const dot = figma.createFrame();
+      dot.resize(6, 6);
+      dot.cornerRadius = 3;
+      setFill(dot, C.accent, 1);
+      f.appendChild(dot);
+    }
+    return f;
+  }
+  function filterChip(label) {
+    const f = hHug();
+    f.paddingTop = 3; f.paddingBottom = 3;
+    f.paddingLeft = 8; f.paddingRight = 6;
+    f.cornerRadius = 3;
+    f.itemSpacing = 4;
+    f.counterAxisAlignItems = "CENTER";
+    setFill(f, C.panelHi, 1);
+    setStroke(f, C.border, 1, 1);
+    f.appendChild(txt(label, F.m, 10, C.text));
+    f.appendChild(txt("×", F.r, 10, C.textFade));
+    return f;
+  }
+  function addChip(label) {
+    const f = hHug();
+    f.paddingTop = 3; f.paddingBottom = 3;
+    f.paddingLeft = 8; f.paddingRight = 8;
+    f.cornerRadius = 3;
+    f.counterAxisAlignItems = "CENTER";
+    f.fills = [];
+    setStroke(f, C.border, 0.7, 1);
+    f.appendChild(txt(label, F.m, 10, C.textDim));
+    return f;
+  }
+  function numberDrop(value) {
+    const f = hHug();
+    f.paddingTop = 5; f.paddingBottom = 5;
+    f.paddingLeft = 10; f.paddingRight = 8;
+    f.cornerRadius = 3;
+    f.itemSpacing = 6;
+    f.counterAxisAlignItems = "CENTER";
+    setFill(f, C.panelHi, 1);
+    setStroke(f, C.border, 1, 1);
+    f.appendChild(txt(value, F.m, 11, C.text));
+    f.appendChild(txt("▾", F.r, 9, C.textDim));
+    return f;
+  }
+
+  // ===== Left: Settings modal mockup =====
+  const s7Panel = vSec(PANEL_W);
+  s7Panel.cornerRadius = 8;
+  s7Panel.clipsContent = true;
+  setFill(s7Panel, C.panel, 1);
+  setStroke(s7Panel, C.border, 1, 1);
+  s7Panel.itemSpacing = 0;
+
+  // ---- Header bar ----
+  const s7Head = hSec(PANEL_W);
+  s7Head.paddingLeft = 20; s7Head.paddingRight = 14;
+  s7Head.paddingTop = 14; s7Head.paddingBottom = 14;
+  s7Head.counterAxisAlignItems = "CENTER";
+  s7Head.primaryAxisAlignItems = "SPACE_BETWEEN";
+  setFill(s7Head, C.panelAlt, 1);
+
+  const s7HeadLeft = hHug();
+  s7HeadLeft.itemSpacing = 10;
+  s7HeadLeft.counterAxisAlignItems = "CENTER";
+  s7HeadLeft.appendChild(txt("⚙", F.m, 16, C.text));
+  s7HeadLeft.appendChild(txt("Settings", F.s, 14, C.white));
+  s7Head.appendChild(s7HeadLeft);
+
+  const s7HeadClose = figma.createFrame();
+  s7HeadClose.resize(22, 22);
+  s7HeadClose.cornerRadius = 3;
+  s7HeadClose.layoutMode = "HORIZONTAL";
+  s7HeadClose.layoutSizingHorizontal = "FIXED";
+  s7HeadClose.layoutSizingVertical = "FIXED";
+  s7HeadClose.primaryAxisAlignItems = "CENTER";
+  s7HeadClose.counterAxisAlignItems = "CENTER";
+  s7HeadClose.fills = [];
+  s7HeadClose.appendChild(txt("×", F.r, 16, C.textDim));
+  s7Head.appendChild(s7HeadClose);
+  s7Panel.appendChild(s7Head);
+  s7Panel.appendChild(divider(PANEL_W, C.border, 1));
+
+  // ---- 7.1 General ----
+  const s71 = settingsSection("7.1 General");
+
+  // Defaults row: label + explanation, then row of 8 big checkboxes
+  const s71DefLabel = vSec(PANEL_W - 40);
+  s71DefLabel.itemSpacing = 2;
+  s71DefLabel.appendChild(txt("New watch folder defaults", F.m, 12, C.text));
+  s71DefLabel.appendChild(txtW("Initial per-column state applied to every newly added folder. Change anytime per row — these defaults only fire at row creation.", F.r, 10, C.textDim, PANEL_W - 40, 14));
+  s71.appendChild(s71DefLabel);
+
+  const s71DefRow = hSec(PANEL_W - 40);
+  s71DefRow.itemSpacing = 18;
+  s71DefRow.counterAxisAlignItems = "CENTER";
+  s71DefRow.primaryAxisAlignItems = "MIN";
+  s71DefRow.appendChild(defaultsCell("WATCH", true, C.accent));
+  s71DefRow.appendChild(defaultsCell("AUTO-SYNC", true, C.accent));
+  s71DefRow.appendChild(defaultsCell("TARGETS", true, C.accent));
+  s71DefRow.appendChild(defaultsCell("SUB", false));
+  s71DefRow.appendChild(defaultsCell("REL", false));
+  s71DefRow.appendChild(defaultsCell("SEQ", true, C.accent));
+  s71DefRow.appendChild(defaultsCell("FLT", false));
+  s71DefRow.appendChild(defaultsCell("DEL", false));
+  s71.appendChild(s71DefRow);
+
+  s71.appendChild(divider(PANEL_W - 40, C.border, 0.4));
+
+  s71.appendChild(settingsRow(
+    "Auto Sync (global)",
+    "Canonical store. Header strip toggle is a shortcut to this row. When ON, per-row 👁 becomes dormant.",
+    toggle(true)
+  ));
+  s71.appendChild(settingsRow(
+    "Show target bins column",
+    "Uncheck to collapse the → Target column. Folder chips still show on hover.",
+    toggle(true)
+  ));
+
+  s7Panel.appendChild(s71);
+  s7Panel.appendChild(divider(PANEL_W, C.border, 0.6));
+
+  // ---- 7.2 Import filters ----
+  const s72 = settingsSection("7.2 Import filters");
+
+  // Mode selector row (radio pair)
+  const s72Mode = hSec(PANEL_W - 40);
+  s72Mode.itemSpacing = 24;
+  s72Mode.counterAxisAlignItems = "CENTER";
+  s72Mode.primaryAxisAlignItems = "SPACE_BETWEEN";
+  const s72ModeLbl = vHug();
+  s72ModeLbl.itemSpacing = 2;
+  s72ModeLbl.appendChild(txt("Mode", F.m, 12, C.text));
+  s72ModeLbl.appendChild(txtW("How the Extensions list is interpreted.", F.r, 10, C.textDim, 220, 14));
+  s72Mode.appendChild(s72ModeLbl);
+
+  const s72Radios = hHug();
+  s72Radios.itemSpacing = 18;
+  s72Radios.counterAxisAlignItems = "CENTER";
+  const rA = hHug();
+  rA.itemSpacing = 6;
+  rA.counterAxisAlignItems = "CENTER";
+  rA.appendChild(radio(true));
+  rA.appendChild(txt("Allowlist — nothing except", F.m, 11, C.text));
+  s72Radios.appendChild(rA);
+  const rD = hHug();
+  rD.itemSpacing = 6;
+  rD.counterAxisAlignItems = "CENTER";
+  rD.appendChild(radio(false));
+  rD.appendChild(txt("Denylist — everything except", F.m, 11, C.textDim));
+  s72Radios.appendChild(rD);
+  s72Mode.appendChild(s72Radios);
+  s72.appendChild(s72Mode);
+
+  // Extensions block
+  const s72ExtLabel = vSec(PANEL_W - 40);
+  s72ExtLabel.itemSpacing = 2;
+  s72ExtLabel.appendChild(txt("Extensions", F.m, 12, C.text));
+  s72ExtLabel.appendChild(txtW("Click × to remove, + to add. Per-folder overrides — v1.1.", F.r, 10, C.textDim, PANEL_W - 40, 14));
+  s72.appendChild(s72ExtLabel);
+
+  const s72ChipsA = hSec(PANEL_W - 40);
+  s72ChipsA.itemSpacing = 6;
+  s72ChipsA.counterAxisAlignItems = "CENTER";
+  s72ChipsA.primaryAxisAlignItems = "MIN";
+  ["mp4", "mov", "mxf", "avi", "wav", "mp3", "aif", "png", "jpg", "tif"].forEach(function(ext) {
+    s72ChipsA.appendChild(filterChip("." + ext));
+  });
+  s72.appendChild(s72ChipsA);
+
+  const s72ChipsB = hSec(PANEL_W - 40);
+  s72ChipsB.itemSpacing = 6;
+  s72ChipsB.counterAxisAlignItems = "CENTER";
+  s72ChipsB.primaryAxisAlignItems = "MIN";
+  ["psd", "ai", "exr", "dpx", "r3d", "ari"].forEach(function(ext) {
+    s72ChipsB.appendChild(filterChip("." + ext));
+  });
+  s72ChipsB.appendChild(addChip("+ add"));
+  s72.appendChild(s72ChipsB);
+
+  s72.appendChild(divider(PANEL_W - 40, C.border, 0.4));
+
+  // Hidden / service files — orthogonal to extension filters
+  const s72HiddenRow = hSec(PANEL_W - 40);
+  s72HiddenRow.itemSpacing = 12;
+  s72HiddenRow.counterAxisAlignItems = "CENTER";
+  s72HiddenRow.primaryAxisAlignItems = "SPACE_BETWEEN";
+  const s72HLbl = vHug();
+  s72HLbl.itemSpacing = 2;
+  s72HLbl.appendChild(txt("Skip hidden & service files", F.m, 12, C.text));
+  s72HLbl.appendChild(txtW(".DS_Store · Thumbs.db · desktop.ini · ~$* · *.tmp · *.part. Separate from Extensions — always applies when on.", F.r, 10, C.textDim, PANEL_W - 160, 14));
+  s72HiddenRow.appendChild(s72HLbl);
+  s72HiddenRow.appendChild(toggle(true));
+  s72.appendChild(s72HiddenRow);
+
+  s7Panel.appendChild(s72);
+  s7Panel.appendChild(divider(PANEL_W, C.border, 0.6));
+
+  // ---- 7.3 Behavior ----
+  const s73 = settingsSection("7.3 Behavior");
+  s73.appendChild(settingsRow(
+    "Safety cover duration",
+    "Seconds after cover lifts before auto re-lock. Applies to FLT and DEL covers.",
+    numberDrop("4 s")
+  ));
+  s73.appendChild(divider(PANEL_W - 40, C.border, 0.3));
+  s73.appendChild(settingsRow(
+    "Undo toast duration",
+    "Window after a destructive commit to hit Undo before OS trash becomes the only recovery.",
+    numberDrop("3 s")
+  ));
+  s73.appendChild(divider(PANEL_W - 40, C.border, 0.3));
+  s73.appendChild(settingsRow(
+    "awaitWriteFinish threshold",
+    "chokidar settle time. Wait N seconds of no size change before treating a file as ready to import.",
+    numberDrop("2 s")
+  ));
+
+  s7Panel.appendChild(s73);
+  s7Panel.appendChild(divider(PANEL_W, C.border, 0.6));
+
+  // ---- 7.4 Danger zone ----
+  const s74Wrap = vSec(PANEL_W);
+  s74Wrap.paddingLeft = 20; s74Wrap.paddingRight = 20;
+  s74Wrap.paddingTop = 18; s74Wrap.paddingBottom = 18;
+  s74Wrap.itemSpacing = 10;
+  s74Wrap.appendChild(txt("7.4 Danger zone", F.s, 12, C.white, undefined, 0.4));
+
+  const s74Shell = vSec(PANEL_W - 40);
+  s74Shell.cornerRadius = 6;
+  setFill(s74Shell, C.canvas, 1);
+  setStroke(s74Shell, C.danger, 0.55, 1);
+  s74Shell.paddingTop = 14; s74Shell.paddingBottom = 14;
+  s74Shell.paddingLeft = 16; s74Shell.paddingRight = 16;
+  s74Shell.itemSpacing = 10;
+
+  const s74Head = hHug();
+  s74Head.itemSpacing = 8;
+  s74Head.counterAxisAlignItems = "CENTER";
+  s74Head.appendChild(txt("⚠", F.b, 12, C.danger));
+  s74Head.appendChild(txt("Enable destructive actions", F.s, 11, C.danger, undefined, 0.6));
+  s74Shell.appendChild(s74Head);
+
+  const s74ToggleRow = hSec(PANEL_W - 72);
+  s74ToggleRow.itemSpacing = 12;
+  s74ToggleRow.counterAxisAlignItems = "CENTER";
+  s74ToggleRow.primaryAxisAlignItems = "SPACE_BETWEEN";
+  const s74TLbl = vHug();
+  s74TLbl.itemSpacing = 2;
+  s74TLbl.appendChild(txt("Enable DEL column", F.m, 12, C.text));
+  s74TLbl.appendChild(txtW("Per-row destructive toggle. Deletes source files → OS trash (48 h recovery on Windows). Safety cover on first click. Never inherits from parent.", F.r, 10, C.textDim, PANEL_W - 160, 14));
+  s74ToggleRow.appendChild(s74TLbl);
+  s74ToggleRow.appendChild(toggle(true));
+  s74Shell.appendChild(s74ToggleRow);
+
+  s74Wrap.appendChild(s74Shell);
+  s7Panel.appendChild(s74Wrap);
+  s7Panel.appendChild(divider(PANEL_W, C.border, 0.6));
+
+  // ---- 7.5 Advanced / Logs ----
+  const s75 = settingsSection("7.5 Advanced / Logs");
+
+  const s75PathCol = vSec(PANEL_W - 40);
+  s75PathCol.itemSpacing = 4;
+  s75PathCol.appendChild(txt("Debug log path", F.m, 12, C.text));
+  const s75PathBox = hSec(PANEL_W - 40);
+  s75PathBox.paddingTop = 7; s75PathBox.paddingBottom = 7;
+  s75PathBox.paddingLeft = 10; s75PathBox.paddingRight = 10;
+  s75PathBox.cornerRadius = 3;
+  s75PathBox.counterAxisAlignItems = "CENTER";
+  setFill(s75PathBox, C.canvas, 1);
+  setStroke(s75PathBox, C.border, 1, 1);
+  s75PathBox.appendChild(txt("%APPDATA%/Adobe/CEP/extensions/sheepdog/sheepdog-debug.log", F.r, 10, C.textDim));
+  s75PathCol.appendChild(s75PathBox);
+  s75.appendChild(s75PathCol);
+
+  const s75BtnRow = hSec(PANEL_W - 40);
+  s75BtnRow.itemSpacing = 10;
+  s75BtnRow.counterAxisAlignItems = "CENTER";
+  s75BtnRow.primaryAxisAlignItems = "MIN";
+  s75BtnRow.appendChild(btnGhost("Save log…"));
+  s75BtnRow.appendChild(btnGhost("Dump now"));
+  s75BtnRow.appendChild(btnGhost("Open log folder"));
+  s75.appendChild(s75BtnRow);
+
+  s7Panel.appendChild(s75);
+  s7Panel.appendChild(divider(PANEL_W, C.border, 1));
+
+  // ---- Footer: Cancel + Save ----
+  const s7Foot = hSec(PANEL_W);
+  s7Foot.paddingLeft = 20; s7Foot.paddingRight = 20;
+  s7Foot.paddingTop = 14; s7Foot.paddingBottom = 14;
+  s7Foot.counterAxisAlignItems = "CENTER";
+  s7Foot.primaryAxisAlignItems = "MAX";
+  s7Foot.itemSpacing = 10;
+  setFill(s7Foot, C.panelAlt, 1);
+  s7Foot.appendChild(btnGhost("Cancel"));
+  s7Foot.appendChild(btnPrimary("Save changes"));
+  s7Panel.appendChild(s7Foot);
+
+  s7Row.appendChild(s7Panel);
+
+  // ===== Right column: rules + globalOverride demo + decision log =====
+  const s7Notes = vSec(contentW - PANEL_W - 32);
+  s7Notes.itemSpacing = 12;
+
+  // Rules card
+  const s7Rules = vSec(contentW - PANEL_W - 32);
+  s7Rules.cornerRadius = 8;
+  setFill(s7Rules, C.panel, 1);
+  setStroke(s7Rules, C.accent, 0.4, 1);
+  s7Rules.paddingTop = 16; s7Rules.paddingBottom = 16;
+  s7Rules.paddingLeft = 20; s7Rules.paddingRight = 20;
+  s7Rules.itemSpacing = 8;
+  const s7RulesHead = hHug();
+  s7RulesHead.itemSpacing = 10;
+  s7RulesHead.counterAxisAlignItems = "CENTER";
+  const s7RulesDot = figma.createFrame();
+  s7RulesDot.resize(6, 6); s7RulesDot.cornerRadius = 3;
+  setFill(s7RulesDot, C.accent, 1);
+  s7RulesHead.appendChild(s7RulesDot);
+  s7RulesHead.appendChild(txt("Settings rules", F.s, 12, C.white, undefined, 0.5));
+  s7Rules.appendChild(s7RulesHead);
+
+  const s7RulesBullets = [
+    "Modal overlay — covers the entire panel UI. Not a drawer, not a tab. Room for future options and single focus.",
+    "SOT: Settings owns every global flag. Header Auto Sync toggle is a shortcut that flips the same underlying state — no duplicate truth.",
+    "New folder defaults applies only at row creation. Changing defaults later does NOT rewrite existing rows.",
+    "Filter mode (Allowlist / Denylist) is project-wide in v1.0. Per-folder overrides punted to v1.1 — usually over-engineering for MVP.",
+    "Hidden/service file skip is a separate switch — orthogonal to extension filters. Always applies when on; changing extensions doesn't force re-managing .DS_Store rules.",
+    "Danger zone uses red border as the gate-warning — it sits OUTSIDE the column and IS the warning gate. Column itself stays calm (activation-only red).",
+    "Save / Cancel both close the modal. Unsaved changes → confirm before Cancel. No auto-save.",
+  ];
+  for (let i = 0; i < s7RulesBullets.length; i++) {
+    const rr = hSec(contentW - PANEL_W - 72);
+    rr.itemSpacing = 8;
+    rr.counterAxisAlignItems = "MIN";
+    rr.appendChild(txt("•", F.b, 12, C.accent));
+    rr.appendChild(txtW(s7RulesBullets[i], F.r, 11, C.text, contentW - PANEL_W - 96, 16));
+    s7Rules.appendChild(rr);
+  }
+  s7Notes.appendChild(s7Rules);
+
+  // globalOverride demo card
+  const s7Override = vSec(contentW - PANEL_W - 32);
+  s7Override.cornerRadius = 8;
+  setFill(s7Override, C.panel, 1);
+  setStroke(s7Override, C.amber, 0.45, 1);
+  s7Override.paddingTop = 16; s7Override.paddingBottom = 16;
+  s7Override.paddingLeft = 20; s7Override.paddingRight = 20;
+  s7Override.itemSpacing = 10;
+  const s7OverHead = hHug();
+  s7OverHead.itemSpacing = 10;
+  s7OverHead.counterAxisAlignItems = "CENTER";
+  const s7OverDot = figma.createFrame();
+  s7OverDot.resize(6, 6); s7OverDot.cornerRadius = 3;
+  setFill(s7OverDot, C.amber, 1);
+  s7OverHead.appendChild(s7OverDot);
+  s7OverHead.appendChild(txt("globalOverride — dormant 👁", F.s, 12, C.white, undefined, 0.5));
+  s7Override.appendChild(s7OverHead);
+  s7Override.appendChild(txtW(
+    "When global Auto Sync = ON, per-folder 👁 renders at opacity 0.4. Stored state is preserved and still editable — click to change the value — but it is currently not influencing sync decisions. " +
+    "Mechanism contrast: subLocked uses color-swap (accent → textDim) reading as \"you can't change this.\" globalOverride uses opacity-reduce on the native accent, reading as \"you can change it, it just doesn't apply right now.\" Two axes → two meanings. Stacked = doubly dormant.",
+    F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
+  ));
+
+  // Two-row demo: global OFF vs global ON
+  function demoRow(label, watchOp) {
+    const d = hSec(contentW - PANEL_W - 72);
+    d.paddingTop = 6; d.paddingBottom = 6;
+    d.paddingLeft = 10; d.paddingRight = 10;
+    d.cornerRadius = 3;
+    d.itemSpacing = 10;
+    d.counterAxisAlignItems = "CENTER";
+    d.primaryAxisAlignItems = "SPACE_BETWEEN";
+    setFill(d, C.panelAlt, 1);
+
+    const leftGrp = hHug();
+    leftGrp.itemSpacing = 8;
+    leftGrp.counterAxisAlignItems = "CENTER";
+    leftGrp.appendChild(labelDot(C.labelForest));
+    leftGrp.appendChild(txt(label, F.m, 11, C.text));
+    d.appendChild(leftGrp);
+
+    const acts = hHug();
+    acts.itemSpacing = 6;
+    acts.counterAxisAlignItems = "CENTER";
+    acts.appendChild(actionIcon("↻", C.text, 1));
+    acts.appendChild(actionIcon("⌕", C.text, 1));
+    acts.appendChild(actionIcon("🧲", C.text, 1));
+    acts.appendChild(actionIcon("👁", C.accent, watchOp));
+    d.appendChild(acts);
+    return d;
+  }
+  const s7OverDemo = vSec(contentW - PANEL_W - 72);
+  s7OverDemo.itemSpacing = 6;
+  s7OverDemo.paddingTop = 4;
+  s7OverDemo.appendChild(demoRow("reelA  ·  global Auto Sync = OFF", 1));
+  s7OverDemo.appendChild(demoRow("reelA  ·  global Auto Sync = ON", 0.4));
+  s7Override.appendChild(s7OverDemo);
+  s7Notes.appendChild(s7Override);
+
+  // Decision log
+  const s7Why = vSec(contentW - PANEL_W - 32);
+  s7Why.cornerRadius = 8;
+  setFill(s7Why, C.panel, 1);
+  setStroke(s7Why, C.border, 1, 1);
+  s7Why.paddingTop = 16; s7Why.paddingBottom = 16;
+  s7Why.paddingLeft = 20; s7Why.paddingRight = 20;
+  s7Why.itemSpacing = 8;
+  const s7WhyHead = hHug();
+  s7WhyHead.itemSpacing = 10;
+  s7WhyHead.counterAxisAlignItems = "CENTER";
+  const s7WhyDot = figma.createFrame();
+  s7WhyDot.resize(6, 6); s7WhyDot.cornerRadius = 3;
+  setFill(s7WhyDot, C.textDim, 1);
+  s7WhyHead.appendChild(s7WhyDot);
+  s7WhyHead.appendChild(txt("Decision log — 2026-04-20", F.s, 12, C.white, undefined, 0.5));
+  s7Why.appendChild(s7WhyHead);
+  s7Why.appendChild(txtW(
+    "Modal over drawer: Settings is rare-but-consequential. A drawer steals horizontal space from the folder list; a tab drops context. A modal gives room for future options and single focus. " +
+    "SOT in Settings, shortcut in header: observed failure mode in Watchtower — Auto Sync flipped from two independent places gets confusing. One canonical store, multiple entry points. " +
+    "Both filter modes matter: Denylist for \"import everything except these\" (loose shoots, unknown codecs). Allowlist for \"strict pipeline, only these\". Not an either/or. " +
+    "Hidden/service skip as its own switch: orthogonal concept. Changing extension filters shouldn't force re-managing .DS_Store / Thumbs.db every time. " +
+    "globalOverride via opacity, not color-swap: subLocked already owns textDim. Adding a second dormant mechanism requires a second visual axis. Opacity is universally readable as \"muted\" and preserves the per-row state's native color — the user still sees what they set.",
+    F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
+  ));
+  s7Notes.appendChild(s7Why);
+
+  s7Row.appendChild(s7Notes);
+  s7.appendChild(s7Row);
+  root.appendChild(s7);
 
   // ---------- Position & focus ----------
   root.x = 100;

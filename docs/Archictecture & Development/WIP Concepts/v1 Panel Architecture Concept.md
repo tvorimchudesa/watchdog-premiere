@@ -489,7 +489,15 @@ Child rows в JSON появляются **только при override**. Virtua
 3. **Merge** — интеграция в MVP-CHECKLIST (заменяем §18.5, меняем §17 §19 §20 под новую модель)
 4. **Excalidraw** — обновить architecture diagram (folder-manager schema v2, UI layers tree/progress)
 5. **figma-watchdog-roadmap.js** — обновить roadmap nodes под новые фичи (columnar tree, lazy children, safety timer)
-6. **Implementation** — после одобрения чеклиста
+6. **Icon set refinement** — drafts в `WIP Concepts/WIP ICONS/` (EYE_Open, EYE_Close, MAGNET, ↻, ⌕).
+   User draft уровня — нужно свести к единому stroke weight (1.5 px / 2 px), единой grid 22×22,
+   единому corner radius. Источник — SVG. После полировки заменить emoji-заглушки
+   (👁/🧲/↻/⌕) в `figma-sheepdog-panel-v1.2.js` на реальные векторы (через embed или
+   component set в Figma). Делается после одобрения панели, до implementation phase.
+7. **Settings panel design** — отдельный экран: allowed extensions, auto-sync, per-folder
+   overrides list, **Danger zone → Enable DEL column** (см. §4.7 в v1.2 mockup),
+   maybe keyboard shortcuts. Дизайн после полировки главной панели.
+8. **Implementation** — после одобрения чеклиста
 
 ---
 
