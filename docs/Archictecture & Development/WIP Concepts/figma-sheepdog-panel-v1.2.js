@@ -42,10 +42,25 @@
 //     + orthogonal Skip hidden/service files), Behavior (cover / undo /
 //     writeFinish durations), Danger zone (Enable DEL column, red border),
 //     Advanced / Logs (Save log, Dump now migrated here). Introduces
-//     globalOverride visual: when global Auto Sync = ON, per-row 👁
-//     renders at opacity 0.4 (dormant — state preserved, editable, but
-//     currently not in effect). Distinct from subLocked (color-swap):
-//     opacity-reduce ≠ color-swap = two axes, two meanings.
+//     Inheritance visual (unified): when global Auto Sync = ON, per-row 👁
+//     and the AUTO-SYNC default render in textDim — same color-swap pattern
+//     subLocked uses for frozen descendants. One visual language for
+//     "value dictated by a parent control," regardless of level.
+//   - §7 REFINED (2026-04-20): 6-cell defaults (dropped WATCH/TARGETS),
+//     renamed "Show target chips on every row", added Show PATH column,
+//     clarified Allow/Deny as two independent stores, expandable service-
+//     file pattern list, removed awaitWriteFinish (dev-only), Auto-log
+//     toggle, Save-log/Dump-now captions.
+//
+// v1.3 ROADMAP (deferred 2026-04-20):
+//   - Smart relink detection. Edge case where watched path X vanishes but
+//     Premiere already relinked bin's media to Y. SheepDog could scan bin
+//     media paths, detect the new common parent, and offer a `[Follow] /
+//     [Keep watching X] / [Delete row]` action. Harder sub-case: split
+//     relink — media moved to 2+ different folders, no single parent to
+//     follow. Deferred from v1.2 because safe UX for multi-target split
+//     needs more thought than v1.2 scope allows. For v1.2: `missing` row
+//     state + manual ⌕ Relink only.
 
 async function main() {
   // ---------- Fonts ----------
@@ -65,13 +80,17 @@ async function main() {
     LABEL: 20,
     TREE: 14,
     NAME: 200,
-    PATH: 262,
+    PATH: 230,
     SUB: 32,
     REL: 32,
     SEQ: 32,
     FLT: 32,
+    EYE: 32,   // auto-sync toggle (cascade-with-lock, parallel to SUB). Was a
+               // glyph in ACTIONS until v1.2 — promoted to a column because eye
+               // is a state-toggle (on/off + inheritance + lock), not an action.
     DEL: 32,   // hidden by default; appears only when Settings → Danger zone enables it
-    ACT: 118,
+    ACT: 88,   // was 118 (4 icons: refresh/search/magnet/eye). Eye promoted to
+               // EYE column, ACT now holds 3 icons (refresh/search/magnet).
     RM: 22,
   };
   const ROW_GAP = 8;
@@ -114,12 +133,96 @@ async function main() {
     b:  { family: "Inter", style: "Bold" },
   };
 
+  // ---------- SVG icon constants ----------
+  const SVG = {
+    refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-ccw-icon lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>',
+    search: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search-icon lucide-search"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>',
+    magnet: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.87891 7.87891H4.22205" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.7784 4.13388C19.7784 3.81433 19.6514 3.50787 19.4255 3.28191C19.1995 3.05595 18.893 2.92899 18.5735 2.92897L15.3265 2.92897C15.0069 2.92899 14.7004 3.05595 14.4745 3.28191C14.2485 3.50787 14.1216 3.81433 14.1215 4.13388V12.6602C14.1215 12.9387 14.0667 13.2146 13.9601 13.472C13.8535 13.7293 13.6972 13.9632 13.5002 14.1602C13.3032 14.3572 13.0694 14.5134 12.812 14.62C12.5546 14.7266 12.2788 14.7815 12.0002 14.7815C11.7216 14.7815 11.4458 14.7266 11.1884 14.62C10.9311 14.5134 10.6972 14.3572 10.5002 14.1602C10.3032 13.9632 10.147 13.7293 10.0404 13.472C9.93377 13.2146 9.8789 12.9387 9.8789 12.6602L9.8789 4.13388C9.87888 3.81433 9.75193 3.50787 9.52597 3.28191C9.30001 3.05595 8.99355 2.92899 8.67399 2.92897L5.42696 2.92897C5.1074 2.92899 4.80094 3.05595 4.57498 3.28191C4.34903 3.50787 4.22207 3.81433 4.22205 4.13388L4.22346 13.1368C4.22365 15.1997 5.04331 17.178 6.50214 18.6366C7.96096 20.0951 9.93944 20.9144 12.0023 20.9142C13.0238 20.9141 14.0352 20.7129 14.9789 20.3219C15.9225 19.9309 16.7799 19.3579 17.5021 18.6356C18.9607 17.1767 19.78 15.1983 19.7798 13.1353L19.7784 4.13388Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.7783 7.87891H14.1215" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    eye: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-icon lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeClosed: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-closed-icon lucide-eye-closed"><path d="m15 18-.722-3.25"/><path d="M2 8a10.645 10.645 0 0 0 20 0"/><path d="m20 15-1.726-2.05"/><path d="m4 15 1.726-2.05"/><path d="m9 18 .722-3.25"/></svg>',
+  };
+
+  // ---------- recolor(node, color) — recursive solid-fill/stroke replacer ----------
+  // Needed because magnetV2 uses stroke="black" (not currentColor); must still
+  // respond to the target color passed in. Walks the full node tree.
+  function recolor(node, color) {
+    // Skip containers (FRAME / GROUP) — their fills are layout chrome, not
+    // icon strokes. Recoloring them turns the whole SVG into a solid square.
+    const isContainer = node.type === "FRAME" || node.type === "GROUP";
+    if (!isContainer) {
+      if ("fills" in node && Array.isArray(node.fills) && node.fills.length > 0) {
+        node.fills = node.fills.map(function(p) {
+          if (p.type === "SOLID") return { type: "SOLID", color: color, opacity: p.opacity != null ? p.opacity : 1 };
+          return p;
+        });
+      }
+      if ("strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0) {
+        node.strokes = node.strokes.map(function(p) {
+          if (p.type === "SOLID") return { type: "SOLID", color: color, opacity: p.opacity != null ? p.opacity : 1 };
+          return p;
+        });
+      }
+    }
+    if ("children" in node && Array.isArray(node.children)) {
+      for (var i = 0; i < node.children.length; i++) {
+        recolor(node.children[i], color);
+      }
+    }
+  }
+
+  // ---------- loadIcon(key, color, size) ----------
+  // Returns a FrameNode (SVG container). resize() is called before any
+  // layout mutations — spec note: SVG frames have no layoutMode, so no
+  // resize-before-layoutMode concern; the wrapper button frame still follows it.
+  function loadIcon(key, color, size) {
+    size = size || 14;
+    const f = figma.createNodeFromSvg(SVG[key]);
+    f.fills = [];
+    f.resize(size, size);
+    // Lucide canonical: viewBox 24 + strokeWeight 2 (ratio 0.083). When we
+    // shrink to <24px the absolute strokeWeight stays 2, so strokes appear
+    // disproportionately thick. Scale strokeWeight proportionally to preserve
+    // the original visual ratio.
+    rescaleStrokes(f, size / 24);
+    recolor(f, color);
+    return f;
+  }
+
+  function rescaleStrokes(node, factor) {
+    if ("strokeWeight" in node && typeof node.strokeWeight === "number") {
+      node.strokeWeight = node.strokeWeight * factor;
+    }
+    if ("children" in node && Array.isArray(node.children)) {
+      for (var i = 0; i < node.children.length; i++) {
+        rescaleStrokes(node.children[i], factor);
+      }
+    }
+  }
+
   // ---------- Helpers ----------
   function setFill(node, color, opacity) {
     node.fills = [{ type: "SOLID", color, opacity: opacity != null ? opacity : 1 }];
   }
   function setStroke(node, color, opacity, weight) {
     node.strokes = [{ type: "SOLID", color, opacity: opacity != null ? opacity : 1 }];
+    node.strokeWeight = weight != null ? weight : 1;
+  }
+  // Pre-compute an alpha blend onto the canonical card bg so a foreground
+  // element renders as a solid RGB — deterministic across zebra rows.
+  // Rule: fg × α + bg × (1−α).
+  function flat(fg, alpha, bg) {
+    bg = bg || C.panel;
+    return {
+      r: fg.r * alpha + bg.r * (1 - alpha),
+      g: fg.g * alpha + bg.g * (1 - alpha),
+      b: fg.b * alpha + bg.b * (1 - alpha)
+    };
+  }
+  function setFillFlat(node, color, alpha, bg) {
+    node.fills = [{ type: "SOLID", color: flat(color, alpha, bg), opacity: 1 }];
+  }
+  function setStrokeFlat(node, color, alpha, weight, bg) {
+    node.strokes = [{ type: "SOLID", color: flat(color, alpha, bg), opacity: 1 }];
     node.strokeWeight = weight != null ? weight : 1;
   }
   function vSec(w) {
@@ -215,14 +318,27 @@ async function main() {
   }
 
   // checkbox(variant, locked?, danger?)
-  //   locked=true → semantic shape preserved (on/off/inherited-on/inherited-off)
-  //     but accent color swaps to textDim (SUB=OFF subtree lockout on descendants).
-  //   danger=true → red ONLY on activation signals (filled on-state + lifted
-  //     cover countdown). Calm states (off, inherited-off, disabled) render
-  //     identically to non-danger columns — column header also stays neutral.
-  //     Rationale: red everywhere would desensitize. The danger signal fires
-  //     only when the control is actually being used. Locked always wins
-  //     over danger (inactive cell is neutral, not red).
+  //
+  // State taxonomy (4 classes — see §1 legend):
+  //   1. Overridden (on / off)          — user explicitly ticked/unticked. Wins over parent.
+  //   2. Inherited (inherited-on / off) — value flows from nearest ancestor override. Clickable.
+  //   3. Locked                         — ancestor cascade-with-lock source forces this value.
+  //                                       variant under locked=true represents the PARENT's
+  //                                       forced value, NOT the user's stored override.
+  //                                       Stored override is preserved silently and restored
+  //                                       when the lock releases. Not clickable.
+  //   4. Row disabled (variant=disabled) — auto-functional-lockout during missing/scanning row
+  //                                       states (media absent / import running). User's clicks
+  //                                       can still toggle, but take no effect until row re-enables.
+  //
+  //   locked=true → visually dimmed (accent → textDim); caller passes parent's forced value as
+  //                 variant. inherited-on/off variants lose their cascade distinction under lock
+  //                 (the lock overrides the cascade) — legend shows only Locked ON / Locked OFF.
+  //   danger=true → red ONLY on activation signals (filled on-state + lifted cover countdown).
+  //                 Calm states render identically to non-danger columns — header also neutral.
+  //                 Rationale: red everywhere desensitizes. The danger signal fires only when
+  //                 the control is actually being used. Locked always wins over danger
+  //                 (inactive cell is neutral, not red).
   function checkbox(variant, locked, danger) {
     const f = figma.createFrame();
     f.resize(14, 14);
@@ -232,8 +348,8 @@ async function main() {
     const markColor = locked ? { r: 0.75, g: 0.75, b: 0.77 } : C.white;
     if (variant === "on") {
       // Active signal — red fill + red stroke in danger mode.
-      setFill(f, tint, locked ? 0.55 : 1);
-      setStroke(f, tint, locked ? 0.7 : 1, 1);
+      if (locked) { setFillFlat(f, tint, 0.55); setStrokeFlat(f, tint, 0.7, 1); }
+      else        { setFill(f, tint, 1);        setStroke(f, tint, 1, 1); }
       f.layoutMode = "HORIZONTAL";
       f.layoutSizingHorizontal = "FIXED";
       f.layoutSizingVertical = "FIXED";
@@ -243,10 +359,11 @@ async function main() {
     } else if (variant === "off") {
       // Calm state — identical to non-danger, no red hint.
       f.fills = [];
-      setStroke(f, locked ? C.textFade : C.borderStrong, locked ? 0.65 : 1, 1);
+      if (locked) setStrokeFlat(f, C.textFade, 0.65, 1);
+      else        setStroke(f, C.borderStrong, 1, 1);
     } else if (variant === "inherited-on") {
-      setFill(f, tint, locked ? 0.2 : 0.35);
-      setStroke(f, tint, locked ? 0.3 : 0.45, 1);
+      setFillFlat(f, tint, locked ? 0.2 : 0.35);
+      setStrokeFlat(f, tint, locked ? 0.3 : 0.45, 1);
       f.layoutMode = "HORIZONTAL";
       f.layoutSizingHorizontal = "FIXED";
       f.layoutSizingVertical = "FIXED";
@@ -256,22 +373,58 @@ async function main() {
     } else if (variant === "inherited-off") {
       // Calm state — identical to non-danger.
       f.fills = [];
-      setStroke(f, locked ? C.textFade : C.borderStrong, locked ? 0.3 : 0.45, 1);
+      setStrokeFlat(f, locked ? C.textFade : C.borderStrong, locked ? 0.3 : 0.45, 1);
     } else if (variant === "cover") {
       // Cover down = calm (matte gray, same as other columns).
       // Cover lifted / countdown running is a separate variant — see "cover-armed".
-      setFill(f, C.white, 0.06);
+      setFillFlat(f, C.white, 0.06);
       setStroke(f, C.borderStrong, 1, 1.5);
     } else if (variant === "cover-armed") {
       // DEL-specific: cover lifted, ~3s countdown running. Red stroke is
       // the signal "destructive commit imminent". Second click commits → "on".
-      setFill(f, C.white, 0.06);
-      setStroke(f, C.danger, 0.85, 1.5);
+      setFillFlat(f, C.white, 0.06);
+      setStrokeFlat(f, C.danger, 0.85, 1.5);
     } else if (variant === "disabled") {
       f.fills = [];
-      setStroke(f, C.textFade, 0.5, 1);
+      setStrokeFlat(f, C.textFade, 0.5, 1);
     }
     return f;
+  }
+
+  // eyeToggle(variant, locked) — cascade-with-lock state for auto-sync.
+  // Parallel to checkbox() palette semantics (on / off / inherited-on /
+  // inherited-off / disabled + locked axis), but visualizes state via eye-open
+  // vs eye-closed lucide glyphs instead of a tick mark. No chrome box — the
+  // glyph itself carries the state, because "eye" is recognizable in a way a
+  // bare tick is not, and a box-around-eye reads as two chrome layers.
+  //
+  //   on             → eye-open, full accent
+  //   off            → eye-closed, borderStrong calm
+  //   inherited-on   → eye-open, flat(accent, 0.4)  — dimmed, visible as "flows from above"
+  //   inherited-off  → eye-closed, flat(textDim, 0.6)
+  //   disabled       → eye-closed, flat(textFade, 0.5) — row-off, very muted
+  //
+  //   locked=true    → accent swaps to textDim; shape preserved. Same rule as
+  //                    checkbox — signals "ancestor SUB=OFF prevents override".
+  function eyeToggle(variant, locked) {
+    const size = 16;
+    const accent = locked ? C.textDim : C.accent;
+    if (variant === "on") {
+      return loadIcon("eye", accent, size);
+    }
+    if (variant === "off") {
+      return loadIcon("eyeClosed", C.borderStrong, size);
+    }
+    if (variant === "inherited-on") {
+      return loadIcon("eye", flat(accent, locked ? 0.25 : 0.4), size);
+    }
+    if (variant === "inherited-off") {
+      return loadIcon("eyeClosed", flat(locked ? C.textFade : C.textDim, 0.6), size);
+    }
+    if (variant === "disabled") {
+      return loadIcon("eyeClosed", flat(C.textFade, 0.5), size);
+    }
+    return loadIcon("eyeClosed", C.borderStrong, size);
   }
 
   function cell(w, child, align) {
@@ -295,7 +448,7 @@ async function main() {
       setFill(f, color, 1);
     } else {
       f.fills = [];
-      setStroke(f, C.textDim, 0.7, 1);
+      setStrokeFlat(f, C.textDim, 0.7, 1);
     }
     return f;
   }
@@ -310,15 +463,24 @@ async function main() {
     f.layoutSizingVertical = "FIXED";
     f.primaryAxisAlignItems = "CENTER";
     f.counterAxisAlignItems = "CENTER";
-    f.appendChild(txt(glyph, F.m, 12, color || C.text));
-    if (opacity != null) f.opacity = opacity;
+    const svgKeyMap = { "↻": "refresh", "⌕": "search", "🧲": "magnet", "👁": "eye" };
+    const svgKey = svgKeyMap[glyph];
+    // Pre-flatten icon color against card bg instead of f.opacity on the
+    // wrapper — otherwise zebra rows bleed through and the icon changes hue.
+    const base = color || C.text;
+    const iconColor = (opacity != null) ? flat(base, opacity) : base;
+    if (svgKey) {
+      f.appendChild(loadIcon(svgKey, iconColor, 14));
+    } else {
+      f.appendChild(txt(glyph, F.m, 12, iconColor));
+    }
     return f;
   }
 
   function actionIconHighlight(glyph, color) {
     const f = actionIcon(glyph, color);
-    setFill(f, color, 0.15);
-    setStroke(f, color, 0.5, 1);
+    setFillFlat(f, color, 0.22);
+    setStrokeFlat(f, color, 0.5, 1);
     return f;
   }
 
@@ -417,8 +579,11 @@ async function main() {
       setFill(wrap, C.amber, 0.10);
       setStroke(wrap, C.amber, 0.45, 1);
     } else {
-      if (cfg.rowFill === "alt") setFill(wrap, C.panelAlt, 1);
-      else if (cfg.rowFill === "hover") setFill(wrap, C.panelHi, 1);
+      // No zebra — premium dark pattern (Premiere / iOS Settings parity).
+      // All rows share panel bg; structure comes from hairline dividers
+      // appended between rows by the call site. Simultaneous-contrast
+      // impossible by construction. Hover remains as lift state.
+      if (cfg.rowFill === "hover") setFill(wrap, C.panelHi, 1);
       else wrap.fills = [];
       if (cfg.fltBorder === "swallowed") setStroke(wrap, C.borderStrong, 0.7, 1);
       else if (cfg.fltBorder === "anchor") setStroke(wrap, C.accent, 0.55, 1);
@@ -426,8 +591,20 @@ async function main() {
 
     // Label cell (leftmost — Premiere parity). Empty circle = no label.
     const labelBoxEarly = cell(COL.LABEL, labelDot(cfg.label));
-    if (cfg.labelInherited) labelBoxEarly.children[0].opacity = 0.4;
-    if (cfg.state === "disabled" || cfg.subLocked) labelBoxEarly.children[0].opacity = 0.35;
+    // Dim inherited/disabled dots by pre-flattening against card bg (solid
+    // RGB, alpha=1) — otherwise zebra rows bleed through the dot.
+    const dimAlpha = cfg.labelInherited ? 0.4
+                    : (cfg.state === "disabled" || cfg.subLocked) ? 0.35
+                    : null;
+    if (dimAlpha != null) {
+      const dot = labelBoxEarly.children[0];
+      if (cfg.label) {
+        dot.fills = [{ type: "SOLID", color: flat(cfg.label, dimAlpha), opacity: 1 }];
+      } else {
+        // Empty dot: stroke was baked at textDim × 0.7. Compose with dim.
+        dot.strokes = [{ type: "SOLID", color: flat(C.textDim, 0.7 * dimAlpha), opacity: 1 }];
+      }
+    }
     r.appendChild(labelBoxEarly);
 
     let glyph = null, treeColor = C.textDim;
@@ -465,6 +642,10 @@ async function main() {
     r.appendChild(cell(COL.REL, checkbox(cfg.rel, cfg.subLocked)));
     r.appendChild(cell(COL.SEQ, checkbox(cfg.seq, cfg.subLocked)));
     r.appendChild(cell(COL.FLT, checkbox(cfg.flt, cfg.subLocked)));
+    // EYE (auto-sync) — cascade-with-lock parallel to SUB. Default "on" when
+    // omitted so legacy configs from pre-v1.2 (where eye was an action glyph)
+    // render as watching by default.
+    r.appendChild(cell(COL.EYE, eyeToggle(cfg.eye || "on", cfg.subLocked)));
     if (cfg.showDel) {
       // DEL cell — transparent bg. Danger palette applied via `danger=true`
       // on checkbox, but red ONLY renders on activation signals (on-state +
@@ -524,6 +705,7 @@ async function main() {
     wrap.appendChild(colHeaderCell(COL.REL, "REL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.SEQ, "SEQ", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.FLT, "FLT", "CENTER"));
+    wrap.appendChild(colHeaderCell(COL.EYE, "EYE", "CENTER"));
     if (opts && opts.showDel) {
       // DEL header — neutral, identical to other columns. The red signal
       // is reserved for the checkbox itself (on-state + cover-armed).
@@ -795,7 +977,7 @@ async function main() {
   const titleSec = vSec(contentW);
   titleSec.itemSpacing = 8;
   titleSec.appendChild(txt("SheepDog — Panel v1.2 Concept", F.b, 36, C.white, 44, 1));
-  titleSec.appendChild(txt("STATE → row-bg tint · LBL leftmost · FLT flat-override · FLT border states · SUB=OFF subtree lockout · DEL danger-zone opt-in · sort auto-clear on drag · 2026-04-20", F.r, 14, C.textDim, 20));
+  titleSec.appendChild(txt("STATE → row-bg tint · LBL leftmost · FLT flat-override · FLT border states · SUB=OFF subtree lockout · DEL danger-zone opt-in · sort auto-clear on drag · §7 Settings refined · 2026-04-20", F.r, 14, C.textDim, 20));
   titleSec.appendChild(divider(contentW, C.white, 0.08));
   root.appendChild(titleSec);
 
@@ -826,109 +1008,101 @@ async function main() {
     {
       indent: 0, state: "ok", tree: "expanded",
       name: "03_Assets", path: "E:/Projects/2026/FILM/03_Assets",
-      sub: "on", rel: "off", seq: "off", flt: "off",
+      sub: "on", rel: "off", seq: "off", flt: "off", eye: "on",
       label: C.labelCerulean,
       actions: [
         { glyph: "↻", color: C.text },
         { glyph: "⌕", color: C.text },
         { glyph: "🧲", color: C.text },
-        { glyph: "👁", color: C.text },
       ],
     },
     {
       indent: 18, state: "ok", tree: "expanded",
       name: "01_Video", path: "…/03_Assets/01_Video",
-      sub: "inherited-on", rel: "inherited-off", seq: "on", flt: "inherited-off",
+      sub: "inherited-on", rel: "inherited-off", seq: "on", flt: "inherited-off", eye: "inherited-on",
       label: null, labelInherited: true,
       actions: [
-        { glyph: "↻", color: C.text, opacity: 0.6 },
-        { glyph: "⌕", color: C.text, opacity: 0.6 },
-        { glyph: "🧲", color: C.text, opacity: 0.6 },
-        { glyph: "👁", color: C.text, opacity: 0.6 },
+        { glyph: "↻", color: C.text },
+        { glyph: "⌕", color: C.text },
+        { glyph: "🧲", color: C.text },
       ],
-      rowFill: "alt",
     },
     {
       indent: 36, state: "ok", tree: "virtual",
       name: "RAW", path: "…/01_Video/RAW",
-      sub: "inherited-on", rel: "inherited-off", seq: "inherited-on", flt: "inherited-off",
+      sub: "inherited-on", rel: "inherited-off", seq: "inherited-on", flt: "inherited-off", eye: "inherited-on",
       label: null, labelInherited: true,
       nameItalic: true, nameColor: C.textDim, pathItalic: true,
       actions: [
-        { glyph: "↻", color: C.text, opacity: 0.35 },
-        { glyph: "⌕", color: C.text, opacity: 0.35 },
-        { glyph: "🧲", color: C.text, opacity: 0.35 },
-        { glyph: "👁", color: C.text, opacity: 0.35 },
+        { glyph: "↻", color: C.text },
+        { glyph: "⌕", color: C.text },
+        { glyph: "🧲", color: C.text },
       ],
       remove: false,
     },
     {
       indent: 18, state: "ok", tree: "collapsed",
       name: "02_Image", path: "…/03_Assets/02_Image",
-      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "cover",
+      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "off",
       label: C.labelForest,
       actions: [
         { glyph: "↻", color: C.text },
         { glyph: "⌕", color: C.text },
         { glyph: "🧲", color: C.text },
-        { glyph: "👁", color: C.text },
       ],
-      rowFill: "alt",
     },
     {
       indent: 18, state: "missing", tree: "leaf",
       name: "03_Archive", path: "…/03_Assets/03_Archive",
-      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off",
+      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
       label: null, labelInherited: true,
       actions: [
         { glyph: "↻", color: C.text, opacity: 0.4 },
         { glyph: "⌕", color: C.accent, highlight: true },
         { glyph: "🧲", color: C.text, opacity: 0.4 },
-        { glyph: "👁", color: C.text, opacity: 0.4 },
       ],
     },
     {
       indent: 0, state: "scanning", tree: "collapsed",
       name: "day_02", path: "D:/Shoots/2026/04/day_02",
-      sub: "on", rel: "off", seq: "off", flt: "off",
+      sub: "on", rel: "off", seq: "off", flt: "off", eye: "on",
       label: C.labelMango,
       actions: [
         { glyph: "↻", color: C.amber, highlight: true },
         { glyph: "⌕", color: C.text },
         { glyph: "🧲", color: C.text },
-        { glyph: "👁", color: C.text },
       ],
     },
     {
-      indent: 0, state: "eye-closed", tree: "collapsed",
+      indent: 0, state: "ok", tree: "collapsed",
       name: "ref", path: "E:/REFLIB/CGI",
-      sub: "on", rel: "on", seq: "off", flt: "off",
+      sub: "on", rel: "on", seq: "off", flt: "off", eye: "off",
       label: C.labelViolet,
       actions: [
         { glyph: "↻", color: C.text },
         { glyph: "⌕", color: C.text },
         { glyph: "🧲", color: C.text },
-        { glyph: "👁", color: C.textDim, opacity: 0.8 },
       ],
-      rowFill: "alt",
     },
     {
       indent: 0, state: "disabled", tree: "leaf",
       name: "_old_backup", path: "E:/archive/2024/FILM_old",
-      sub: "disabled", rel: "disabled", seq: "disabled", flt: "disabled",
+      sub: "disabled", rel: "disabled", seq: "disabled", flt: "disabled", eye: "disabled",
       label: null, labelInherited: true,
       nameColor: C.textFade,
       actions: [
         { glyph: "↻", color: C.text, opacity: 0.3 },
         { glyph: "⌕", color: C.text, opacity: 0.3 },
         { glyph: "🧲", color: C.text, opacity: 0.3 },
-        { glyph: "👁", color: C.text, opacity: 0.3 },
       ],
     },
   ];
   for (const cfg of treeRows) {
     panel.appendChild(row(cfg));
-    panel.appendChild(divider(PANEL_W, C.border, 0.4));
+    // Row hairline: ~4pp L delta from panel bg. Premiere Project panel parity
+    // — structure without zebra. Stronger dividers below (opacity 1) bound
+    // section groups; these subtle ones just separate list items.
+    panel.appendChild(divider(PANEL_W, C.border, 0.25));
   }
 
   panel.appendChild(progressPanel("collapsed"));
@@ -995,6 +1169,33 @@ async function main() {
     { demo: demoBox(24, 18, checkbox("inherited-on", true)),
       title: "Inherited ON · SUB locked",
       desc: "Same cascade, applied to an inherited value. Faded grey — preserves the \"this flows from somewhere\" reading while signalling inactivity." },
+  ]));
+
+  // Eye palette — parallel to checkbox() palette but rendered via lucide
+  // eye-open/eye-closed glyphs. Same axes: value (on/off) × source (override/
+  // inherited) × lock (none / ancestor-locked). Disabled = row-off.
+  ann.appendChild(annCard("Eye (AUTO-SYNC) variants — parallel to checkbox", C.accent, [
+    { demo: demoBox(24, 18, eyeToggle("on")),
+      title: "Overridden ON",
+      desc: "Auto-watch active on this folder. Eye-open, full accent — mirrors checkbox(\"on\")." },
+    { demo: demoBox(24, 18, eyeToggle("off")),
+      title: "Overridden OFF",
+      desc: "Auto-watch off. Eye-closed, calm borderStrong — still visible and manually syncable." },
+    { demo: demoBox(24, 18, eyeToggle("inherited-on")),
+      title: "Inherited ON",
+      desc: "Flows from an ancestor row (or global Auto Sync = ON). Eye-open, faded accent." },
+    { demo: demoBox(24, 18, eyeToggle("inherited-off")),
+      title: "Inherited OFF",
+      desc: "Same cascade, from ancestor or global OFF. Eye-closed, faded textDim." },
+    { demo: demoBox(24, 18, eyeToggle("disabled")),
+      title: "Disabled (row off)",
+      desc: "Row's enabled=false. Eye-closed, very muted textFade. Stored value remembered." },
+    { demo: demoBox(24, 18, eyeToggle("on", true)),
+      title: "Overridden ON · ancestor locked",
+      desc: "Descendant of a SUB=OFF ancestor. Shape preserved (eye-open), accent swapped to textDim — \"watching intent stored, currently frozen by ancestor\"." },
+    { demo: demoBox(24, 18, eyeToggle("inherited-on", true)),
+      title: "Inherited ON · ancestor locked",
+      desc: "Cascade + lock. Faded textDim eye-open — reads as \"flows from somewhere, but frozen right now\"." },
   ]));
 
   // FLT-border demo — mini row-like swatch showing border state
@@ -1567,29 +1768,28 @@ async function main() {
   g1Panel.appendChild(row({
     indent: 0, state: "ok", tree: "expanded",
     name: "Footage", path: "E:/Projects/FILM/Footage",
-    sub: "on", rel: "off", seq: "off", flt: "on",
+    sub: "on", rel: "off", seq: "off", flt: "on", eye: "on",
     label: C.labelCerulean,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  g1Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  g1Panel.appendChild(divider(PANEL_W, C.border, 0.25));
   g1Panel.appendChild(row({
     indent: 18, state: "ok", tree: "expanded",
     name: "day1", path: "…/Footage/day1",
-    sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-on",
+    sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-on", eye: "inherited-on",
     label: null, labelInherited: true,
     extraTargetChip: "→ Footage",
     fltBorder: "swallowed",
-    actions: [{ glyph: "↻", color: C.text, opacity: 0.6 }, { glyph: "⌕", color: C.text, opacity: 0.6 }, { glyph: "🧲", color: C.text, opacity: 0.6 }, { glyph: "👁", color: C.text, opacity: 0.6 }],
-    rowFill: "alt",
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  g1Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  g1Panel.appendChild(divider(PANEL_W, C.border, 0.25));
   g1Panel.appendChild(row({
     indent: 36, state: "ok", tree: "leaf",
     name: "RAW", path: "…/day1/RAW",
-    sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "off",
+    sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "off", eye: "inherited-on",
     label: null, labelInherited: true,
     fltBorder: "anchor",
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
   g1.appendChild(g1Panel);
   g1.appendChild(txt(
@@ -1768,28 +1968,27 @@ async function main() {
   s46Panel.appendChild(row({
     indent: 0, state: "ok", tree: "expanded",
     name: "Archive", path: "E:/Projects/FILM/Archive",
-    sub: "off", rel: "off", seq: "off", flt: "off",
+    sub: "off", rel: "off", seq: "off", flt: "off", eye: "on",
     label: C.labelIris,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  s46Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s46Panel.appendChild(divider(PANEL_W, C.border, 0.25));
   s46Panel.appendChild(row({
     indent: 18, state: "ok", tree: "expanded",
     name: "2025_Q4", path: "…/Archive/2025_Q4",
-    sub: "inherited-off", rel: "on", seq: "inherited-off", flt: "inherited-off",
+    sub: "inherited-off", rel: "on", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
     label: null, labelInherited: true,
     subLocked: true,
-    actions: [{ glyph: "↻", color: C.text, opacity: 0.35 }, { glyph: "⌕", color: C.text, opacity: 0.35 }, { glyph: "🧲", color: C.text, opacity: 0.35 }, { glyph: "👁", color: C.text, opacity: 0.35 }],
-    rowFill: "alt",
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  s46Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s46Panel.appendChild(divider(PANEL_W, C.border, 0.25));
   s46Panel.appendChild(row({
     indent: 36, state: "ok", tree: "leaf",
     name: "shoot_01", path: "…/2025_Q4/shoot_01",
-    sub: "inherited-off", rel: "inherited-on", seq: "inherited-off", flt: "off",
+    sub: "inherited-off", rel: "inherited-on", seq: "inherited-off", flt: "off", eye: "inherited-on",
     label: null, labelInherited: true,
     subLocked: true,
-    actions: [{ glyph: "↻", color: C.text, opacity: 0.35 }, { glyph: "⌕", color: C.text, opacity: 0.35 }, { glyph: "🧲", color: C.text, opacity: 0.35 }, { glyph: "👁", color: C.text, opacity: 0.35 }],
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
   s46Row.appendChild(s46Panel);
 
@@ -1886,46 +2085,44 @@ async function main() {
   s47Panel.appendChild(row({
     indent: 0, state: "ok", tree: "collapsed",
     name: "footage", path: "E:/Projects/FILM/footage",
-    sub: "on", rel: "off", seq: "on", flt: "off",
+    sub: "on", rel: "off", seq: "on", flt: "off", eye: "on",
     showDel: true, del: "off",
     label: C.labelForest,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  s47Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 0.25));
 
   // Row B — DEL=on (red filled checkbox)
   s47Panel.appendChild(row({
     indent: 0, state: "ok", tree: "collapsed",
     name: "reelA", path: "D:/Shoots/2026/reelA",
-    sub: "on", rel: "off", seq: "on", flt: "off",
+    sub: "on", rel: "off", seq: "on", flt: "off", eye: "on",
     showDel: true, del: "on",
     label: C.labelMango,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
-    rowFill: "alt",
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  s47Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 0.25));
 
   // Row C — DEL=cover-armed (user clicked once, cover lifted, red countdown ~3s)
   s47Panel.appendChild(row({
     indent: 0, state: "ok", tree: "collapsed",
     name: "reelB", path: "D:/Shoots/2026/reelB",
-    sub: "on", rel: "off", seq: "on", flt: "off",
+    sub: "on", rel: "off", seq: "on", flt: "off", eye: "on",
     showDel: true, del: "cover-armed",
     label: C.labelRose,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }, { glyph: "👁", color: C.text }],
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
-  s47Panel.appendChild(divider(PANEL_W, C.border, 0.4));
+  s47Panel.appendChild(divider(PANEL_W, C.border, 0.25));
 
   // Row D — DEL=on but subLocked (locked wins over danger → textDim, not red)
   s47Panel.appendChild(row({
     indent: 0, state: "ok", tree: "leaf",
     name: "reelC", path: "…/Archive/reelC",
-    sub: "inherited-off", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off",
+    sub: "inherited-off", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
     showDel: true, del: "on",
     subLocked: true,
     label: null, labelInherited: true,
-    actions: [{ glyph: "↻", color: C.text, opacity: 0.35 }, { glyph: "⌕", color: C.text, opacity: 0.35 }, { glyph: "🧲", color: C.text, opacity: 0.35 }, { glyph: "👁", color: C.text, opacity: 0.35 }],
-    rowFill: "alt",
+    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
   }));
 
   s47Row.appendChild(s47Panel);
@@ -2335,7 +2532,9 @@ async function main() {
     ic.layoutSizingVertical = "FIXED";
     ic.primaryAxisAlignItems = "CENTER";
     ic.counterAxisAlignItems = "CENTER";
-    ic.appendChild(txt(glyph, F.m, 15, color));
+    const icSvgKey = { "↻": "refresh", "⌕": "search", "🧲": "magnet", "👁": "eye" }[glyph];
+    if (icSvgKey) ic.appendChild(loadIcon(icSvgKey, color, 18));
+    else ic.appendChild(txt(glyph, F.m, 15, color));
     head.appendChild(ic);
     head.appendChild(txt(title, F.s, 13, C.white));
     card.appendChild(head);
@@ -2373,19 +2572,18 @@ async function main() {
   //   Five sections: General · Import filters · Behavior · Danger zone
   //   · Advanced. Save/Cancel footer.
   //
-  //   globalOverride mechanism — NEW: when global Auto Sync = ON, per-row
-  //   👁 renders at opacity 0.4 (dormant — state preserved and still
-  //   editable, but currently not in effect). Distinction from subLocked:
-  //   subLocked uses color-swap (fill → textDim) meaning "you can't change
-  //   this." globalOverride uses opacity-reduce on the native accent
-  //   meaning "you can still change it, it just doesn't apply right now."
-  //   Different mechanisms → different meanings. Stacked = doubly dormant.
+  //   Inheritance visual — unified: when global Auto Sync = ON, per-row 👁
+  //   enters the inherited/dormant state — rendered in C.textDim (same
+  //   color-swap pattern subLocked uses for frozen descendants). One visual
+  //   language for "value is dictated by a parent control", regardless of
+  //   whether the parent is an ancestor row or a global setting. Stored
+  //   state is preserved and still editable.
   // ==================================================
   const s7 = vSec(contentW);
   s7.itemSpacing = 16;
   s7.appendChild(sectionTitle(
     "7. Settings panel — modal overlay, canonical config",
-    "Full-panel overlay (not a drawer, not a tab). Five sections. All global state lives here; header toggles are shortcuts pointing at the same store. Global Auto Sync = ON dims per-row 👁 to opacity 0.4 (dormant) — opacity-reduce ≠ color-swap, so it reads distinctly from subLocked.",
+    "Full-panel overlay (not a drawer, not a tab). Five sections. All global state lives here; header toggles are shortcuts pointing at the same store. Global Auto Sync = ON puts per-row 👁 into the inherited state (textDim color-swap) — same visual language as subLocked, because both mean \"value dictated by a parent control.\"",
     contentW
   ));
 
@@ -2416,7 +2614,10 @@ async function main() {
     return rw;
   }
   // New watch folder defaults — big checkbox cell with column label below
-  function defaultsCell(label, isOn, color) {
+  // dormant: when true, color-swap to textDim (unified inheritance visual — same pattern as
+  //   subLocked). State preserved, still editable via click, but effective behavior is driven
+  //   by the parent global toggle.
+  function defaultsCell(label, isOn, color, dormant) {
     const col = vHug();
     col.itemSpacing = 6;
     col.counterAxisAlignItems = "CENTER";
@@ -2429,15 +2630,27 @@ async function main() {
     box.primaryAxisAlignItems = "CENTER";
     box.counterAxisAlignItems = "CENTER";
     if (isOn) {
-      setFill(box, color || C.accent, 1);
-      setStroke(box, color || C.accent, 1, 1);
-      box.appendChild(txt("✓", F.b, 14, C.white));
+      if (dormant) {
+        // Inheritance color-swap: matches checkbox("on", locked=true)
+        setFillFlat(box, C.textDim, 0.55);
+        setStrokeFlat(box, C.textDim, 0.7, 1);
+        box.appendChild(txt("✓", F.b, 14, { r: 0.75, g: 0.75, b: 0.77 }));
+      } else {
+        setFill(box, color || C.accent, 1);
+        setStroke(box, color || C.accent, 1, 1);
+        box.appendChild(txt("✓", F.b, 14, C.white));
+      }
     } else {
       box.fills = [];
-      setStroke(box, C.borderStrong, 1, 1);
+      if (dormant) {
+        // Inheritance color-swap off: matches checkbox("off", locked=true)
+        setStrokeFlat(box, C.textFade, 0.65, 1);
+      } else {
+        setStroke(box, C.borderStrong, 1, 1);
+      }
     }
     col.appendChild(box);
-    col.appendChild(txt(label, F.s, 9, isOn ? C.text : C.textDim, undefined, 0.8));
+    col.appendChild(txt(label, F.s, 9, dormant ? C.textDim : (isOn ? C.text : C.textDim), undefined, 0.8));
     return col;
   }
   function radio(isOn) {
@@ -2538,7 +2751,26 @@ async function main() {
   // ---- 7.1 General ----
   const s71 = settingsSection("7.1 General");
 
-  // Defaults row: label + explanation, then row of 8 big checkboxes
+  s71.appendChild(settingsRow(
+    "Auto Sync (global)",
+    "Canonical store. Header strip toggle is a shortcut to this row. When ON, per-row 👁 and the AUTO-SYNC default enter the inherited state (textDim).",
+    toggle(true)
+  ));
+  s71.appendChild(settingsRow(
+    "Show target chips on every row",
+    "Adds a → Target chip inside the NAME of every row. Off by default — chips still appear on hover for swallowed rows (Guard 2).",
+    toggle(true)
+  ));
+  s71.appendChild(settingsRow(
+    "Show PATH column",
+    "Off = hide the PATH column, show folder name only. Useful for narrow panels and users who navigate by name.",
+    toggle(true)
+  ));
+
+  s71.appendChild(divider(PANEL_W - 40, C.border, 0.4));
+
+  // Defaults row: label + explanation, then row of 6 big checkboxes
+  // Placed after global toggles — defaults are secondary configuration.
   const s71DefLabel = vSec(PANEL_W - 40);
   s71DefLabel.itemSpacing = 2;
   s71DefLabel.appendChild(txt("New watch folder defaults", F.m, 12, C.text));
@@ -2549,9 +2781,8 @@ async function main() {
   s71DefRow.itemSpacing = 18;
   s71DefRow.counterAxisAlignItems = "CENTER";
   s71DefRow.primaryAxisAlignItems = "MIN";
-  s71DefRow.appendChild(defaultsCell("WATCH", true, C.accent));
-  s71DefRow.appendChild(defaultsCell("AUTO-SYNC", true, C.accent));
-  s71DefRow.appendChild(defaultsCell("TARGETS", true, C.accent));
+  // AUTO-SYNC cell: global Auto Sync = ON → stored default is inherited (textDim color-swap)
+  s71DefRow.appendChild(defaultsCell("AUTO-SYNC", true, C.accent, true));
   s71DefRow.appendChild(defaultsCell("SUB", false));
   s71DefRow.appendChild(defaultsCell("REL", false));
   s71DefRow.appendChild(defaultsCell("SEQ", true, C.accent));
@@ -2559,17 +2790,10 @@ async function main() {
   s71DefRow.appendChild(defaultsCell("DEL", false));
   s71.appendChild(s71DefRow);
 
-  s71.appendChild(divider(PANEL_W - 40, C.border, 0.4));
-
-  s71.appendChild(settingsRow(
-    "Auto Sync (global)",
-    "Canonical store. Header strip toggle is a shortcut to this row. When ON, per-row 👁 becomes dormant.",
-    toggle(true)
-  ));
-  s71.appendChild(settingsRow(
-    "Show target bins column",
-    "Uncheck to collapse the → Target column. Folder chips still show on hover.",
-    toggle(true)
+  // Dormant caption: explains why AUTO-SYNC checkbox is muted
+  s71.appendChild(txtW(
+    "AUTO-SYNC default is inherited while global Auto Sync is ON — stored value preserved, applies when global is off. Same visual (textDim) as subLocked descendants — unified inheritance language.",
+    F.i, 10, C.textDim, PANEL_W - 40, 14
   ));
 
   s7Panel.appendChild(s71);
@@ -2611,7 +2835,7 @@ async function main() {
   const s72ExtLabel = vSec(PANEL_W - 40);
   s72ExtLabel.itemSpacing = 2;
   s72ExtLabel.appendChild(txt("Extensions", F.m, 12, C.text));
-  s72ExtLabel.appendChild(txtW("Click × to remove, + to add. Per-folder overrides — v1.1.", F.r, 10, C.textDim, PANEL_W - 40, 14));
+  s72ExtLabel.appendChild(txtW("Click × to remove, + to add. Switching mode above swaps the visible list — each mode has its own independent chip set, preserved when you toggle.", F.r, 10, C.textDim, PANEL_W - 40, 14));
   s72.appendChild(s72ExtLabel);
 
   const s72ChipsA = hSec(PANEL_W - 40);
@@ -2648,6 +2872,21 @@ async function main() {
   s72HiddenRow.appendChild(toggle(true));
   s72.appendChild(s72HiddenRow);
 
+  // Service-file presets — expandable chip list
+  s72.appendChild(txtW("Presets — add custom patterns as needed. Shell globs (*, ?, []) supported.", F.r, 10, C.textDim, PANEL_W - 40, 14));
+
+  const s72SvcChips = hSec(PANEL_W - 40);
+  s72SvcChips.itemSpacing = 6;
+  s72SvcChips.counterAxisAlignItems = "CENTER";
+  s72SvcChips.primaryAxisAlignItems = "MIN";
+  [".DS_Store", "Thumbs.db", "desktop.ini", "~$*", "*.tmp", "*.part"].forEach(function(pat) {
+    s72SvcChips.appendChild(filterChip(pat));
+  });
+  s72SvcChips.appendChild(addChip("+ add pattern"));
+  s72.appendChild(s72SvcChips);
+
+  s72.appendChild(txtW("When the toggle is off, this list is ignored but preserved.", F.i, 10, C.textDim, PANEL_W - 40, 14));
+
   s7Panel.appendChild(s72);
   s7Panel.appendChild(divider(PANEL_W, C.border, 0.6));
 
@@ -2663,12 +2902,6 @@ async function main() {
     "Undo toast duration",
     "Window after a destructive commit to hit Undo before OS trash becomes the only recovery.",
     numberDrop("3 s")
-  ));
-  s73.appendChild(divider(PANEL_W - 40, C.border, 0.3));
-  s73.appendChild(settingsRow(
-    "awaitWriteFinish threshold",
-    "chokidar settle time. Wait N seconds of no size change before treating a file as ready to import.",
-    numberDrop("2 s")
   ));
 
   s7Panel.appendChild(s73);
@@ -2715,6 +2948,13 @@ async function main() {
   // ---- 7.5 Advanced / Logs ----
   const s75 = settingsSection("7.5 Advanced / Logs");
 
+  s75.appendChild(settingsRow(
+    "Auto-log to disk",
+    "When off, logs stay in memory only. Dump now still works for on-demand snapshots.",
+    toggle(false)
+  ));
+  s75.appendChild(divider(PANEL_W - 40, C.border, 0.3));
+
   const s75PathCol = vSec(PANEL_W - 40);
   s75PathCol.itemSpacing = 4;
   s75PathCol.appendChild(txt("Debug log path", F.m, 12, C.text));
@@ -2737,6 +2977,9 @@ async function main() {
   s75BtnRow.appendChild(btnGhost("Dump now"));
   s75BtnRow.appendChild(btnGhost("Open log folder"));
   s75.appendChild(s75BtnRow);
+
+  s75.appendChild(txtW("Save log… — export the current session's log buffer to a chosen file.", F.r, 10, C.textDim, PANEL_W - 40, 14));
+  s75.appendChild(txtW("Dump now — full diagnostic snapshot (watch folders + settings + recent errors + ring buffer) to the debug folder above. For bug reports.", F.r, 10, C.textDim, PANEL_W - 40, 14));
 
   s7Panel.appendChild(s75);
   s7Panel.appendChild(divider(PANEL_W, C.border, 1));
@@ -2811,16 +3054,16 @@ async function main() {
   s7OverDot.resize(6, 6); s7OverDot.cornerRadius = 3;
   setFill(s7OverDot, C.amber, 1);
   s7OverHead.appendChild(s7OverDot);
-  s7OverHead.appendChild(txt("globalOverride — dormant 👁", F.s, 12, C.white, undefined, 0.5));
+  s7OverHead.appendChild(txt("Inheritance — AUTO-SYNC locked by global", F.s, 12, C.white, undefined, 0.5));
   s7Override.appendChild(s7OverHead);
   s7Override.appendChild(txtW(
-    "When global Auto Sync = ON, per-folder 👁 renders at opacity 0.4. Stored state is preserved and still editable — click to change the value — but it is currently not influencing sync decisions. " +
-    "Mechanism contrast: subLocked uses color-swap (accent → textDim) reading as \"you can't change this.\" globalOverride uses opacity-reduce on the native accent, reading as \"you can change it, it just doesn't apply right now.\" Two axes → two meanings. Stacked = doubly dormant.",
+    "Global Auto Sync locks the effective per-folder AUTO-SYNC exactly the way a parent SUB=OFF locks a child SUB — same locking semantics, same visual. AUTO-SYNC renders as textDim (inherited), stored value preserved, still editable, but effective sync is driven by the global toggle. " +
+    "Demo below uses a checkbox instead of the MVP 👁 emoji so the inheritance parity with subLocked reads at a glance — in ship UI AUTO-SYNC will become a proper column and the emoji goes away.",
     F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
   ));
 
   // Two-row demo: global OFF vs global ON
-  function demoRow(label, watchOp) {
+  function demoRow(label, dormant) {
     const d = hSec(contentW - PANEL_W - 72);
     d.paddingTop = 6; d.paddingBottom = 6;
     d.paddingLeft = 10; d.paddingRight = 10;
@@ -2843,17 +3086,151 @@ async function main() {
     acts.appendChild(actionIcon("↻", C.text, 1));
     acts.appendChild(actionIcon("⌕", C.text, 1));
     acts.appendChild(actionIcon("🧲", C.text, 1));
-    acts.appendChild(actionIcon("👁", C.accent, watchOp));
+    // AUTO-SYNC — rendered as checkbox in this demo (MVP uses 👁 emoji; will
+    // become a real column in ship UI). Using checkbox here to make the
+    // inheritance parity with subLocked unambiguous: dormant = textDim fill,
+    // identical to checkbox("on", locked=true) for a SUB-locked descendant.
+    const asWrap = figma.createFrame();
+    asWrap.resize(22, 22);
+    asWrap.fills = [];
+    asWrap.layoutMode = "HORIZONTAL";
+    asWrap.layoutSizingHorizontal = "FIXED";
+    asWrap.layoutSizingVertical = "FIXED";
+    asWrap.primaryAxisAlignItems = "CENTER";
+    asWrap.counterAxisAlignItems = "CENTER";
+    asWrap.appendChild(checkbox("on", dormant));
+    acts.appendChild(asWrap);
     d.appendChild(acts);
     return d;
   }
   const s7OverDemo = vSec(contentW - PANEL_W - 72);
   s7OverDemo.itemSpacing = 6;
   s7OverDemo.paddingTop = 4;
-  s7OverDemo.appendChild(demoRow("reelA  ·  global Auto Sync = OFF", 1));
-  s7OverDemo.appendChild(demoRow("reelA  ·  global Auto Sync = ON", 0.4));
+  s7OverDemo.appendChild(demoRow("reelA  ·  global Auto Sync = OFF", false));
+  s7OverDemo.appendChild(demoRow("reelA  ·  global Auto Sync = ON", true));
   s7Override.appendChild(s7OverDemo);
   s7Notes.appendChild(s7Override);
+
+  // Icon button states — Adobe parity demo card
+  const s7IconStates = vSec(contentW - PANEL_W - 32);
+  s7IconStates.cornerRadius = 8;
+  setFill(s7IconStates, C.panel, 1);
+  setStroke(s7IconStates, C.border, 1, 1);
+  s7IconStates.paddingTop = 16; s7IconStates.paddingBottom = 16;
+  s7IconStates.paddingLeft = 20; s7IconStates.paddingRight = 20;
+  s7IconStates.itemSpacing = 10;
+
+  // Card header
+  const s7ISHead = hHug();
+  s7ISHead.itemSpacing = 10;
+  s7ISHead.counterAxisAlignItems = "CENTER";
+  const s7ISDot = figma.createFrame();
+  s7ISDot.resize(6, 6); s7ISDot.cornerRadius = 3;
+  setFill(s7ISDot, C.accent, 1);
+  s7ISHead.appendChild(s7ISDot);
+  s7ISHead.appendChild(txt("Icon button states — Adobe parity", F.s, 12, C.white, undefined, 0.5));
+  s7IconStates.appendChild(s7ISHead);
+
+  // Body text
+  s7IconStates.appendChild(txtW(
+    "Icon buttons match Premiere Pro / Adobe Spectrum DS behavior. Rest is bright and calm, hover lifts with a white@8% bg (not darken), pressed briefly deepens to white@12%, toggle-ON = accent icon inside an accent@22% pill with a thin accent stroke. The pill is the signal — color alone isn't enough, icons all look 'slightly different' otherwise. Same principle as our inheritance: color-swap + bg change, never opacity.",
+    F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
+  ));
+
+  // State grid — header row
+  const s7ISGridW = contentW - PANEL_W - 72;
+  const s7ISGrid = vSec(s7ISGridW);
+  s7ISGrid.itemSpacing = 6;
+
+  // Column header row
+  const s7ISColHdr = hSec(s7ISGridW);
+  s7ISColHdr.itemSpacing = 16;
+  s7ISColHdr.counterAxisAlignItems = "CENTER";
+  // 40px spacer for the label column
+  s7ISColHdr.appendChild(spacer(40, 1));
+  const stateLabels = ["rest", "hover", "pressed", "active"];
+  for (var si = 0; si < stateLabels.length; si++) {
+    const lbl = figma.createFrame();
+    lbl.resize(44, 10);
+    lbl.fills = [];
+    lbl.layoutMode = "HORIZONTAL";
+    lbl.layoutSizingHorizontal = "FIXED";
+    lbl.layoutSizingVertical = "HUG";
+    lbl.primaryAxisAlignItems = "CENTER";
+    lbl.counterAxisAlignItems = "CENTER";
+    lbl.appendChild(txt(stateLabels[si].toUpperCase(), F.s, 10, C.textDim, undefined, 0.5));
+    s7ISColHdr.appendChild(lbl);
+  }
+  s7ISGrid.appendChild(s7ISColHdr);
+
+  // Helper: build one state cell (22×22 frame)
+  function stateCell(svgKey, iconColor, bgColor, bgOpacity, strokeColor, strokeOpacity) {
+    const f = figma.createFrame();
+    f.resize(22, 22);
+    f.cornerRadius = 3;
+    f.layoutMode = "HORIZONTAL";
+    f.layoutSizingHorizontal = "FIXED";
+    f.layoutSizingVertical = "FIXED";
+    f.primaryAxisAlignItems = "CENTER";
+    f.counterAxisAlignItems = "CENTER";
+    if (bgColor) {
+      setFill(f, bgColor, bgOpacity != null ? bgOpacity : 1);
+    } else {
+      f.fills = [];
+    }
+    if (strokeColor) {
+      setStroke(f, strokeColor, strokeOpacity != null ? strokeOpacity : 1, 1);
+    }
+    f.appendChild(loadIcon(svgKey, iconColor, 14));
+    return f;
+  }
+
+  // Icon rows: ↻ ⌕ 🧲 👁
+  const s7ISIcons = [
+    { key: "refresh", label: "↻" },
+    { key: "search",  label: "⌕" },
+    { key: "magnet",  label: "🧲" },
+    { key: "eye",     label: "👁" },
+  ];
+  for (var ii = 0; ii < s7ISIcons.length; ii++) {
+    const iconKey = s7ISIcons[ii].key;
+    const iconLabel = s7ISIcons[ii].label;
+    const row = hSec(s7ISGridW);
+    row.itemSpacing = 16;
+    row.counterAxisAlignItems = "CENTER";
+
+    // Label cell — 40px, show icon dimly as reference
+    const labelCell = figma.createFrame();
+    labelCell.resize(40, 22);
+    labelCell.fills = [];
+    labelCell.layoutMode = "HORIZONTAL";
+    labelCell.layoutSizingHorizontal = "FIXED";
+    labelCell.layoutSizingVertical = "FIXED";
+    labelCell.primaryAxisAlignItems = "CENTER";
+    labelCell.counterAxisAlignItems = "CENTER";
+    labelCell.appendChild(loadIcon(iconKey, C.textDim, 14));
+    row.appendChild(labelCell);
+
+    // rest: transparent, icon = C.text
+    row.appendChild(stateCell(iconKey, C.text, null, null, null, null));
+    // hover: white@0.08 bg, icon = C.text
+    row.appendChild(stateCell(iconKey, C.text, C.white, 0.08, null, null));
+    // pressed: white@0.12 bg, icon = C.text
+    row.appendChild(stateCell(iconKey, C.text, C.white, 0.12, null, null));
+    // active: accent@0.22 bg + accent stroke, icon = C.accent
+    row.appendChild(stateCell(iconKey, C.accent, C.accent, 0.22, C.accent, 0.5));
+
+    s7ISGrid.appendChild(row);
+  }
+  s7IconStates.appendChild(s7ISGrid);
+
+  // Caption below grid
+  s7IconStates.appendChild(txtW(
+    "No opacity animation for state changes — Premiere is snappy, transitions ~100ms or less. Disabled state (not shown) = icon=C.textFade, no hover interaction.",
+    F.r, 10, C.textDim, contentW - PANEL_W - 72, 14
+  ));
+
+  s7Notes.appendChild(s7IconStates);
 
   // Decision log
   const s7Why = vSec(contentW - PANEL_W - 32);
@@ -2877,7 +3254,8 @@ async function main() {
     "SOT in Settings, shortcut in header: observed failure mode in Watchtower — Auto Sync flipped from two independent places gets confusing. One canonical store, multiple entry points. " +
     "Both filter modes matter: Denylist for \"import everything except these\" (loose shoots, unknown codecs). Allowlist for \"strict pipeline, only these\". Not an either/or. " +
     "Hidden/service skip as its own switch: orthogonal concept. Changing extension filters shouldn't force re-managing .DS_Store / Thumbs.db every time. " +
-    "globalOverride via opacity, not color-swap: subLocked already owns textDim. Adding a second dormant mechanism requires a second visual axis. Opacity is universally readable as \"muted\" and preserves the per-row state's native color — the user still sees what they set.",
+    "Unified inheritance visual: previously subLocked and globalOverride used different dormant mechanisms (color-swap vs opacity). We merged them — both now render as textDim color-swap. Rationale: user reads both as 'value is frozen by a parent control.' Whether the parent is an ancestor row or a global toggle is a distinction without a visual difference — the user cares that it's inherited, not what level it came from. Opacity-reduce stays reserved for disabled-row indicators (e.g. actions on a missing folder). " +
+    "Host parity — Adobe Spectrum iconbutton model: SheepDog runs inside Premiere, so all interactive states mirror Premiere's patterns. Rest bright, hover bg-up (white tint, not dim), toggle-ON = accent icon + accent pill (not solo accent icon). Our inheritance color-swap principle is already Adobe-native — no opacity for state changes, ever.",
     F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
   ));
   s7Notes.appendChild(s7Why);
