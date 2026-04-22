@@ -23,7 +23,7 @@
 //     three FLT border states (swallowed vs anchor vs calm).
 //   - §4.6 NEW: SUB=OFF subtree lockout. No subs watched → no bins → all
 //     descendant controls (SUB/REL/SEQ/FLT) rendered as inherited-off,
-//     NAME/PATH dimmed to textFade. row() supports cfg.subLocked that cascades
+//     NAME/PATH dimmed to strokeMid. row() supports cfg.subLocked that cascades
 //     the dim. Parent keeps its SUB checkbox active (SOT, toggleable).
 //   - §4.7 NEW (2026-04-20): DEL column. Danger-zone opt-in, never inherits,
 //     safety cover on first click. checkbox() gains 3rd param `danger` that
@@ -108,7 +108,12 @@ async function main() {
 
     text:      { r: 0.87, g: 0.87, b: 0.88 },
     textDim:   { r: 0.60, g: 0.60, b: 0.63 },
-    textFade:  { r: 0.42, g: 0.42, b: 0.45 },
+    // Mirror of TC.strokeMid — DISABLED action-icon colour; matches
+    // Disabled/Locked checkbox stroke per the §1.5 palette SOT.
+    strokeMid: { r: 0.486, g: 0.486, b: 0.514 },
+    // Mirror of TC.borderBright — active action-icon colour (REST/HOVER/PRESSED),
+    // per §1.5 palette SOT. Workhorse «bright» token: primary text + active buttons.
+    borderBright: { r: 0.843, g: 0.843, b: 0.855 },
 
     accent:    { r: 0.08, g: 0.47, b: 0.95 },
     accentSoft:{ r: 0.08, g: 0.47, b: 0.95 },
@@ -140,6 +145,9 @@ async function main() {
     magnet: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.87891 7.87891H4.22205" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.7784 4.13388C19.7784 3.81433 19.6514 3.50787 19.4255 3.28191C19.1995 3.05595 18.893 2.92899 18.5735 2.92897L15.3265 2.92897C15.0069 2.92899 14.7004 3.05595 14.4745 3.28191C14.2485 3.50787 14.1216 3.81433 14.1215 4.13388V12.6602C14.1215 12.9387 14.0667 13.2146 13.9601 13.472C13.8535 13.7293 13.6972 13.9632 13.5002 14.1602C13.3032 14.3572 13.0694 14.5134 12.812 14.62C12.5546 14.7266 12.2788 14.7815 12.0002 14.7815C11.7216 14.7815 11.4458 14.7266 11.1884 14.62C10.9311 14.5134 10.6972 14.3572 10.5002 14.1602C10.3032 13.9632 10.147 13.7293 10.0404 13.472C9.93377 13.2146 9.8789 12.9387 9.8789 12.6602L9.8789 4.13388C9.87888 3.81433 9.75193 3.50787 9.52597 3.28191C9.30001 3.05595 8.99355 2.92899 8.67399 2.92897L5.42696 2.92897C5.1074 2.92899 4.80094 3.05595 4.57498 3.28191C4.34903 3.50787 4.22207 3.81433 4.22205 4.13388L4.22346 13.1368C4.22365 15.1997 5.04331 17.178 6.50214 18.6366C7.96096 20.0951 9.93944 20.9144 12.0023 20.9142C13.0238 20.9141 14.0352 20.7129 14.9789 20.3219C15.9225 19.9309 16.7799 19.3579 17.5021 18.6356C18.9607 17.1767 19.78 15.1983 19.7798 13.1353L19.7784 4.13388Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.7783 7.87891H14.1215" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     eye: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-icon lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
     eyeClosed: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-closed-icon lucide-eye-closed"><path d="m15 18-.722-3.25"/><path d="M2 8a10.645 10.645 0 0 0 20 0"/><path d="m20 15-1.726-2.05"/><path d="m4 15 1.726-2.05"/><path d="m9 18 .722-3.25"/></svg>',
+    settings: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>',
+    chevronDown: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down-icon lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>',
+    chevronRight: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right-icon lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>',
   };
 
   // ---------- recolor(node, color) — recursive solid-fill/stroke replacer ----------
@@ -302,7 +310,10 @@ async function main() {
     return f;
   }
 
-  function treeCell(glyph, color, visible) {
+  // treeCell(svgKey, color, visible)
+  // svgKey: "chevronDown" | "chevronRight" | null. Lucide flat chevrons replace
+  // the old "⌄" / "›" text glyphs — unified icon SOT with the rest of the panel.
+  function treeCell(svgKey, color, visible) {
     const f = figma.createFrame();
     f.resize(COL.TREE, ROW_H);
     f.fills = [];
@@ -311,120 +322,275 @@ async function main() {
     f.layoutSizingVertical = "FIXED";
     f.primaryAxisAlignItems = "CENTER";
     f.counterAxisAlignItems = "CENTER";
-    if (visible !== false && glyph) {
-      f.appendChild(txt(glyph, F.m, 11, color || C.textDim));
+    if (visible !== false && svgKey) {
+      f.appendChild(loadIcon(svgKey, color || C.textDim, 12));
     }
     return f;
+  }
+
+  // TC — "Taxonomy Colors", solid-hex palette shared by checkbox() and
+  // eyeToggle(). Locked tier uses SOLID backMid (not textDim × 0.35) so the
+  // Locked OFF «крышечка» reads as a deliberate fill rather than a faint
+  // crack. Values mirror Tabel.jsx and the SECTION 1.5 state-taxonomy tables.
+  // Locked ON ✓ reuses strokeMid (same hex as the box stroke) — user can't
+  // edit a Locked cell anyway, so a distinct check colour would be a token
+  // carrying no new information. See §1.5 palette card for the rationale.
+  const TC = {
+    backMid:      { r: 0.294, g: 0.294, b: 0.306 },
+    backDim:      { r: 0.196, g: 0.196, b: 0.206 },
+    strokeMid:    { r: 0.486, g: 0.486, b: 0.514 },
+    borderBright: { r: 0.843, g: 0.843, b: 0.855 },
+    accentFill:   { r: 0.122, g: 0.259, b: 0.431 },
+    accentEdge:   { r: 0.118, g: 0.290, b: 0.514 },
+  };
+
+  // Body-path helpers for lucide eye / eye-closed. Apply fill backing or
+  // dashed stroke to ONLY the main body path (outer almond on open eye,
+  // eyelid arc on closed eye) — leaving pupil / lashes untouched so the
+  // glyph still reads as an eye. Single source of truth for which SVG child
+  // index is the body: index 1 on eyeClosed (the big arc between 4 lashes),
+  // index 0 on eye (outer almond, pupil is child[1]).
+  function bodyChildIndex(glyph) {
+    return glyph === "eyeClosed" ? 1 : 0;
+  }
+  function applyBodyBacking(node, glyph, color) {
+    if (!("children" in node) || !Array.isArray(node.children)) return;
+    const body = node.children[bodyChildIndex(glyph)];
+    if (body && "fills" in body) {
+      body.fills = [{ type: "SOLID", color: color, opacity: 1 }];
+    }
+  }
+  function applyBodyDash(node, glyph) {
+    if (!("children" in node) || !Array.isArray(node.children)) return;
+    const body = node.children[bodyChildIndex(glyph)];
+    if (body && "dashPattern" in body) {
+      body.dashPattern = [1.5, 1.5];
+    }
   }
 
   // checkbox(variant, locked?, danger?)
   //
-  // State taxonomy (4 classes — see §1 legend):
-  //   1. Overridden (on / off)          — user explicitly ticked/unticked. Wins over parent.
-  //   2. Inherited (inherited-on / off) — value flows from nearest ancestor override. Clickable.
-  //   3. Locked                         — ancestor cascade-with-lock source forces this value.
-  //                                       variant under locked=true represents the PARENT's
-  //                                       forced value, NOT the user's stored override.
-  //                                       Stored override is preserved silently and restored
-  //                                       when the lock releases. Not clickable.
-  //   4. Row disabled (variant=disabled) — auto-functional-lockout during missing/scanning row
-  //                                       states (media absent / import running). User's clicks
-  //                                       can still toggle, but take no effect until row re-enables.
+  // 4-tier "presence" gradient (see §1 legend and §1.5 taxonomy tables).
+  // Classes derived from (variant, locked) inputs for backward compat:
   //
-  //   locked=true → visually dimmed (accent → textDim); caller passes parent's forced value as
-  //                 variant. inherited-on/off variants lose their cascade distinction under lock
-  //                 (the lock overrides the cascade) — legend shows only Locked ON / Locked OFF.
-  //   danger=true → red ONLY on activation signals (filled on-state + lifted cover countdown).
-  //                 Calm states render identically to non-danger columns — header also neutral.
-  //                 Rationale: red everywhere desensitizes. The danger signal fires only when
-  //                 the control is actually being used. Locked always wins over danger
-  //                 (inactive cell is neutral, not red).
+  //   Tier 1 Overridden — variant "on"|"off",  locked=false
+  //                       → ON: full accent fill + white check
+  //                         OFF: empty fill, bright borderBright stroke
+  //   Tier 2 Inherited  — variant "inherited-*", locked=false
+  //                       → ON: accentFill fill + accentEdge stroke + white ✓
+  //                         OFF: empty fill, strokeMid stroke
+  //   Tier 3 Locked     — any value variant, locked=true
+  //                       → ON: backMid fill + strokeMid stroke + strokeMid ✓
+  //                         (check reuses the stroke hex — user can't edit a
+  //                         Locked cell, so a distinct check colour would be a
+  //                         token carrying no new information)
+  //                         OFF: SAME backMid fill (the «крышечка»), no check.
+  //                         Caller passes parent's FORCED value as variant.
+  //   Tier 4 Disabled   — variant "disabled-on" / "disabled-off" / "disabled"
+  //                       → empty fill, dashed strokeMid border, strokeMid ✓
+  //                         on ON. Row auto-frozen (media missing).
+  //   Tier 4L Disabled+Locked — variant "disabled-locked-on" / "disabled-locked-off"
+  //                       → backDim fill, backMid dashed stroke, backMid ✓
+  //                         on ON. Subtree dormant (SUB=off cascade) AND the
+  //                         control is hard-locked by ancestor (eye asymmetric
+  //                         cascade): value preserved but doubly-frozen.
+  //
+  //   Cover variants ("cover", "cover-armed") — DEL-only safety layer,
+  //   orthogonal to the 4-tier gradient.
+  //
+  //   danger=true → red ONLY on Overridden ON (active activation signal).
+  //                 Other classes render neutral — rationale: red everywhere
+  //                 desensitizes; danger fires only when control is actually
+  //                 being used. Locked / Disabled always win over danger.
   function checkbox(variant, locked, danger) {
+    let cls, value;
+    if (variant === "cover" || variant === "cover-armed") {
+      cls = variant;
+    } else if (variant === "disabled-locked-on") {
+      cls = "disabled-locked"; value = "on";
+    } else if (variant === "disabled-locked-off" || variant === "disabled-locked") {
+      cls = "disabled-locked"; value = "off";
+    } else if (variant === "disabled-inherited-on") {
+      cls = "disabled-inherited"; value = "on";
+    } else if (variant === "disabled-inherited-off") {
+      cls = "disabled-inherited"; value = "off";
+    } else if (variant === "disabled" || variant === "disabled-off") {
+      cls = "disabled"; value = "off";
+    } else if (variant === "disabled-on") {
+      cls = "disabled"; value = "on";
+    } else if (locked) {
+      cls = "locked";
+      value = (variant === "on" || variant === "inherited-on") ? "on" : "off";
+    } else if (variant === "inherited-on" || variant === "inherited-off") {
+      cls = "inherited";
+      value = variant === "inherited-on" ? "on" : "off";
+    } else {
+      cls = "overridden"; value = variant;
+    }
+
     const f = figma.createFrame();
     f.resize(14, 14);
     f.cornerRadius = 3;
-    const baseAccent = danger ? C.danger : C.accent;
-    const tint = locked ? C.textDim : baseAccent;
-    const markColor = locked ? { r: 0.75, g: 0.75, b: 0.77 } : C.white;
-    if (variant === "on") {
-      // Active signal — red fill + red stroke in danger mode.
-      if (locked) { setFillFlat(f, tint, 0.55); setStrokeFlat(f, tint, 0.7, 1); }
-      else        { setFill(f, tint, 1);        setStroke(f, tint, 1, 1); }
+
+    function center() {
       f.layoutMode = "HORIZONTAL";
-      f.layoutSizingHorizontal = "FIXED";
-      f.layoutSizingVertical = "FIXED";
-      f.primaryAxisAlignItems = "CENTER";
-      f.counterAxisAlignItems = "CENTER";
-      f.appendChild(txt("✓", F.b, 10, markColor));
-    } else if (variant === "off") {
-      // Calm state — identical to non-danger, no red hint.
-      f.fills = [];
-      if (locked) setStrokeFlat(f, C.textFade, 0.65, 1);
-      else        setStroke(f, C.borderStrong, 1, 1);
-    } else if (variant === "inherited-on") {
-      setFillFlat(f, tint, locked ? 0.2 : 0.35);
-      setStrokeFlat(f, tint, locked ? 0.3 : 0.45, 1);
-      f.layoutMode = "HORIZONTAL";
-      f.layoutSizingHorizontal = "FIXED";
-      f.layoutSizingVertical = "FIXED";
-      f.primaryAxisAlignItems = "CENTER";
-      f.counterAxisAlignItems = "CENTER";
-      f.appendChild(txt("✓", F.m, 9, markColor));
-    } else if (variant === "inherited-off") {
-      // Calm state — identical to non-danger.
-      f.fills = [];
-      setStrokeFlat(f, locked ? C.textFade : C.borderStrong, locked ? 0.3 : 0.45, 1);
-    } else if (variant === "cover") {
-      // Cover down = calm (matte gray, same as other columns).
-      // Cover lifted / countdown running is a separate variant — see "cover-armed".
+      f.layoutSizingHorizontal = "FIXED"; f.layoutSizingVertical = "FIXED";
+      f.primaryAxisAlignItems = "CENTER"; f.counterAxisAlignItems = "CENTER";
+    }
+
+    if (cls === "overridden" && value === "on") {
+      const fillColor = danger ? C.danger : C.accent;
+      setFill(f, fillColor, 1); setStroke(f, fillColor, 1, 1);
+      center(); f.appendChild(txt("✓", F.b, 10, C.white));
+    } else if (cls === "overridden" && value === "off") {
+      f.fills = []; setStroke(f, TC.borderBright, 1, 1);
+    } else if (cls === "inherited" && value === "on") {
+      setFill(f, TC.accentFill, 1); setStroke(f, TC.accentEdge, 1, 1);
+      center(); f.appendChild(txt("✓", F.m, 9, C.white));
+    } else if (cls === "inherited" && value === "off") {
+      f.fills = []; setStroke(f, TC.strokeMid, 1, 1);
+    } else if (cls === "locked" && value === "on") {
+      setFill(f, TC.backMid, 1); setStroke(f, TC.strokeMid, 1, 1);
+      center(); f.appendChild(txt("✓", F.m, 9, TC.strokeMid));
+    } else if (cls === "locked" && value === "off") {
+      // «крышечка» — SOLID backMid fill, same as Locked ON sans check.
+      setFill(f, TC.backMid, 1); setStroke(f, TC.strokeMid, 1, 1);
+    } else if (cls === "disabled" && value === "on") {
+      f.fills = []; setStroke(f, TC.strokeMid, 1, 1);
+      f.dashPattern = [2, 2];
+      center(); f.appendChild(txt("✓", F.m, 9, TC.strokeMid));
+    } else if (cls === "disabled" && value === "off") {
+      f.fills = []; setStroke(f, TC.strokeMid, 1, 1);
+      f.dashPattern = [2, 2];
+    } else if (cls === "disabled-inherited" && value === "on") {
+      f.fills = []; setStroke(f, TC.backMid, 1, 1);
+      f.dashPattern = [2, 2];
+      center(); f.appendChild(txt("✓", F.m, 9, TC.backMid));
+    } else if (cls === "disabled-inherited" && value === "off") {
+      f.fills = []; setStroke(f, TC.backMid, 1, 1);
+      f.dashPattern = [2, 2];
+    } else if (cls === "disabled-locked" && value === "on") {
+      setFill(f, TC.backDim, 1); setStroke(f, TC.backMid, 1, 1);
+      f.dashPattern = [2, 2];
+      center(); f.appendChild(txt("✓", F.m, 9, TC.backMid));
+    } else if (cls === "disabled-locked" && value === "off") {
+      setFill(f, TC.backDim, 1); setStroke(f, TC.backMid, 1, 1);
+      f.dashPattern = [2, 2];
+    } else if (cls === "cover") {
       setFillFlat(f, C.white, 0.06);
       setStroke(f, C.borderStrong, 1, 1.5);
-    } else if (variant === "cover-armed") {
-      // DEL-specific: cover lifted, ~3s countdown running. Red stroke is
-      // the signal "destructive commit imminent". Second click commits → "on".
+    } else if (cls === "cover-armed") {
       setFillFlat(f, C.white, 0.06);
       setStrokeFlat(f, C.danger, 0.85, 1.5);
-    } else if (variant === "disabled") {
-      f.fills = [];
-      setStrokeFlat(f, C.textFade, 0.5, 1);
     }
     return f;
   }
 
-  // eyeToggle(variant, locked) — cascade-with-lock state for auto-sync.
-  // Parallel to checkbox() palette semantics (on / off / inherited-on /
-  // inherited-off / disabled + locked axis), but visualizes state via eye-open
-  // vs eye-closed lucide glyphs instead of a tick mark. No chrome box — the
-  // glyph itself carries the state, because "eye" is recognizable in a way a
-  // bare tick is not, and a box-around-eye reads as two chrome layers.
+  // eyeToggle(variant, locked) — NO container chrome. Class signal lives
+  // in the eye glyph itself: outline colour tier + optional body fill
+  // «подложка» (Locked tiers only) + optional body dashPattern (Disabled*).
+  // Pupil / lashes stay solid stroke so the glyph still reads as an eye.
   //
-  //   on             → eye-open, full accent
-  //   off            → eye-closed, borderStrong calm
-  //   inherited-on   → eye-open, flat(accent, 0.4)  — dimmed, visible as "flows from above"
-  //   inherited-off  → eye-closed, flat(textDim, 0.6)
-  //   disabled       → eye-closed, flat(textFade, 0.5) — row-off, very muted
+  // Symmetric cascade (updated 2026-04-21):
+  //   • open eye  = SOFT INHERIT — descendants echo open, may individually
+  //     override to closed. Cascade is now SYMMETRIC through Inherited.
+  //   • closed eye = SOFT INHERIT — descendants echo closed, may individually
+  //     override to open.
+  //   Locked tier is RESERVED — mechanism preserved for future use (e.g.
+  //   admin-locked shared libraries). Not produced by current cascade logic.
+  //   Direct variant="locked-on" still works if a call-site needs it.
   //
-  //   locked=true    → accent swaps to textDim; shape preserved. Same rule as
-  //                    checkbox — signals "ancestor SUB=OFF prevents override".
+  // Call-site coercions:
+  //   variant="inherited-on"           → render as Inherited ON (soft inherit)
+  //   variant="inherited-off"          → render as Inherited OFF
+  //   locked=true + "on"-family        → Inherited ON (not Locked)
+  //   locked=true + "off"-family       → Inherited OFF (unchanged)
+  //   variant="disabled-inherited-on"  → Disabled+Inherited ON
+  //   variant="disabled-inherited-off" → Disabled+Inherited OFF
+  //
+  //   Tier 1  Overridden         — eye / eyeClosed, accent / borderBright stroke.
+  //   Tier 2  Inherited          — ON and OFF: eye / eyeClosed, strokeMid stroke,
+  //                                 no backing, not dashed. Bare glyph only.
+  //   Tier 3  Locked (reserved)  — ONLY ON: eye, strokeMid stroke + backMid body
+  //                                 fill. Not produced by current cascade.
+  //   Tier 4  Disabled           — eye / eyeClosed, strokeMid stroke + dashed body.
+  //   Tier 4I Disabled+Inherited — eye / eyeClosed, strokeMid stroke + dashed body,
+  //                                 no backing. Composed: row dormant + soft-inherited
+  //                                 value. Visually same as plain Disabled — distinction
+  //                                 is semantic.
+  //   Tier 4L Disabled+Locked (reserved) — ONLY ON: eye, backMid stroke + backDim body
+  //                                 fill + dashed body. Not produced by current cascade.
+  //
+  // Returns a 20×20 transparent alignment wrap around the 14×14 glyph — the
+  // wrap is never painted, never dashed, never bordered.
   function eyeToggle(variant, locked) {
-    const size = 16;
-    const accent = locked ? C.textDim : C.accent;
-    if (variant === "on") {
-      return loadIcon("eye", accent, size);
+    let cls, value;
+    if (variant === "disabled-locked-on") {
+      cls = "disabled-locked"; value = "on";
+    } else if (variant === "disabled-inherited-on") {
+      cls = "disabled-inherited"; value = "on";
+    } else if (variant === "disabled-inherited-off") {
+      cls = "disabled-inherited"; value = "off";
+    } else if (variant === "disabled" || variant === "disabled-off") {
+      cls = "disabled"; value = "off";
+    } else if (variant === "disabled-on") {
+      cls = "disabled"; value = "on";
+    } else if (variant === "inherited-on") {
+      // Cascade is now symmetric — inherited-on renders as Inherited, not Locked.
+      cls = "inherited"; value = "on";
+    } else if (locked) {
+      const isOn = (variant === "on" || variant === "inherited-on");
+      // locked=true flag cascades as Inherited (symmetric cascade, not hard-lock).
+      if (isOn) { cls = "inherited"; value = "on"; }
+      else      { cls = "inherited"; value = "off"; }
+    } else if (variant === "inherited-off") {
+      cls = "inherited"; value = "off";
+    } else {
+      cls = "overridden"; value = variant === "on" ? "on" : "off";
     }
-    if (variant === "off") {
-      return loadIcon("eyeClosed", C.borderStrong, size);
+
+    const wrap = figma.createFrame();
+    wrap.resize(20, 20);
+    wrap.layoutMode = "HORIZONTAL";
+    wrap.layoutSizingHorizontal = "FIXED"; wrap.layoutSizingVertical = "FIXED";
+    wrap.primaryAxisAlignItems = "CENTER"; wrap.counterAxisAlignItems = "CENTER";
+    wrap.fills = [];
+
+    const glyphSize = 14;
+    let glyph, color, backing = null, dashed = false;
+    if (cls === "overridden" && value === "on") {
+      glyph = "eye"; color = C.accent;
+    } else if (cls === "overridden" && value === "off") {
+      glyph = "eyeClosed"; color = TC.borderBright;
+    } else if (cls === "inherited" && value === "on") {
+      // Symmetric Inherited ON: bare eye-open + strokeMid outline, no backing.
+      glyph = "eye"; color = TC.strokeMid;
+    } else if (cls === "inherited" && value === "off") {
+      glyph = "eyeClosed"; color = TC.strokeMid;
+    } else if (cls === "locked" && value === "on") {
+      // Reserved tier — backMid подложка distinguishes from Inherited ON.
+      glyph = "eye"; color = TC.strokeMid; backing = TC.backMid;
+    } else if (cls === "disabled" && value === "on") {
+      glyph = "eye"; color = TC.strokeMid; dashed = true;
+    } else if (cls === "disabled" && value === "off") {
+      glyph = "eyeClosed"; color = TC.strokeMid; dashed = true;
+    } else if (cls === "disabled-inherited" && value === "on") {
+      // Disabled+Inherited ON: strokeMid dashed, no backing (not Locked).
+      glyph = "eye"; color = TC.strokeMid; dashed = true;
+    } else if (cls === "disabled-inherited" && value === "off") {
+      // Disabled+Inherited OFF: strokeMid dashed, no backing.
+      glyph = "eyeClosed"; color = TC.backMid; dashed = true;
+    } else if (cls === "disabled-locked" && value === "on") {
+      // Reserved tier — backDim подложка + backMid stroke distinguishes from
+      // Disabled+Inherited.
+      glyph = "eye"; color = TC.backMid; backing = TC.backDim; dashed = true;
     }
-    if (variant === "inherited-on") {
-      return loadIcon("eye", flat(accent, locked ? 0.25 : 0.4), size);
-    }
-    if (variant === "inherited-off") {
-      return loadIcon("eyeClosed", flat(locked ? C.textFade : C.textDim, 0.6), size);
-    }
-    if (variant === "disabled") {
-      return loadIcon("eyeClosed", flat(C.textFade, 0.5), size);
-    }
-    return loadIcon("eyeClosed", C.borderStrong, size);
+
+    const g = loadIcon(glyph, color, glyphSize);
+    if (backing) applyBodyBacking(g, glyph, backing);
+    if (dashed)  applyBodyDash(g, glyph);
+    wrap.appendChild(g);
+    return wrap;
   }
 
   function cell(w, child, align) {
@@ -463,7 +629,7 @@ async function main() {
     f.layoutSizingVertical = "FIXED";
     f.primaryAxisAlignItems = "CENTER";
     f.counterAxisAlignItems = "CENTER";
-    const svgKeyMap = { "↻": "refresh", "⌕": "search", "🧲": "magnet", "👁": "eye" };
+    const svgKeyMap = { "↻": "refresh", "⌕": "search", "🧲": "magnet", "👁": "eye", "⚙": "settings" };
     const svgKey = svgKeyMap[glyph];
     // Pre-flatten icon color against card bg instead of f.opacity on the
     // wrapper — otherwise zebra rows bleed through and the icon changes hue.
@@ -566,38 +732,29 @@ async function main() {
     wrap.paddingTop = 0; wrap.paddingBottom = 0;
     wrap.itemSpacing = 0;
     wrap.counterAxisAlignItems = "CENTER";
-    // State → row-bg tint. Red = missing, amber = scanning. Everything else
-    // (ok, disabled, eye-closed) = calm, signal-free.
-    // FLT border (fltBorder prop) is a second visual channel — only applies on
-    // calm rows. "swallowed" = dark-gray border (sub dissolved by ancestor
-    // FLT=ON). "anchor" = accent-blue border (explicit FLT=OFF override inside
-    // a flat region). State tints always win over FLT border.
-    if (cfg.state === "missing") {
-      setFill(wrap, C.danger, 0.08);
-      setStroke(wrap, C.danger, 0.55, 1);
-    } else if (cfg.state === "scanning") {
-      setFill(wrap, C.amber, 0.10);
-      setStroke(wrap, C.amber, 0.45, 1);
-    } else {
-      // No zebra — premium dark pattern (Premiere / iOS Settings parity).
-      // All rows share panel bg; structure comes from hairline dividers
-      // appended between rows by the call site. Simultaneous-contrast
-      // impossible by construction. Hover remains as lift state.
-      if (cfg.rowFill === "hover") setFill(wrap, C.panelHi, 1);
-      else wrap.fills = [];
-      if (cfg.fltBorder === "swallowed") setStroke(wrap, C.borderStrong, 0.7, 1);
-      else if (cfg.fltBorder === "anchor") setStroke(wrap, C.accent, 0.55, 1);
-    }
+    // Row bg is calm by default — no zebra, no red/amber state tint.
+    // The old missing/scanning row-level bg+stroke were deprecated 2026-04-21:
+    // per-cell signals (⚠ + red path text, amber refresh icon) already tell
+    // the story; duplicating them on the row chrome was noisy. A replacement
+    // state system is coming in v1.3. Hover still lifts to panelHi.
+    // FLT border (fltBorder prop) stays — "swallowed" = dark-gray border
+    // (sub dissolved by ancestor FLT=ON). "anchor" = accent-blue border
+    // (explicit FLT=OFF inside a flat region).
+    if (cfg.rowFill === "hover") setFill(wrap, C.panelHi, 1);
+    else wrap.fills = [];
+    if (cfg.fltBorder === "swallowed") setStroke(wrap, C.borderStrong, 0.7, 1);
+    else if (cfg.fltBorder === "anchor") setStroke(wrap, C.accent, 0.55, 1);
 
-    // Label cell (leftmost — Premiere parity). Empty circle = no label.
-    const labelBoxEarly = cell(COL.LABEL, labelDot(cfg.label));
-    // Dim inherited/disabled dots by pre-flattening against card bg (solid
-    // RGB, alpha=1) — otherwise zebra rows bleed through the dot.
+    // Label cell — built now so we can pre-dim the dot, but appended at the
+    // tail end of the row (between ACTIONS and RM) per the 2026-04-21 layout
+    // refactor. LBL left Premiere's leftmost slot to free horizontal real
+    // estate for name/path and to sit closer to the × remove control.
+    const labelBox = cell(COL.LABEL, labelDot(cfg.label));
     const dimAlpha = cfg.labelInherited ? 0.4
                     : (cfg.state === "disabled" || cfg.subLocked) ? 0.35
                     : null;
     if (dimAlpha != null) {
-      const dot = labelBoxEarly.children[0];
+      const dot = labelBox.children[0];
       if (cfg.label) {
         dot.fills = [{ type: "SOLID", color: flat(cfg.label, dimAlpha), opacity: 1 }];
       } else {
@@ -605,13 +762,12 @@ async function main() {
         dot.strokes = [{ type: "SOLID", color: flat(C.textDim, 0.7 * dimAlpha), opacity: 1 }];
       }
     }
-    r.appendChild(labelBoxEarly);
 
-    let glyph = null, treeColor = C.textDim;
-    if (cfg.tree === "expanded") glyph = "⌄";
-    else if (cfg.tree === "collapsed") glyph = "›";
-    else if (cfg.tree === "virtual") glyph = "›";
-    r.appendChild(treeCell(glyph, treeColor, cfg.tree !== "leaf"));
+    let svgKey = null, treeColor = C.textDim;
+    if (cfg.tree === "expanded") svgKey = "chevronDown";
+    else if (cfg.tree === "collapsed") svgKey = "chevronRight";
+    else if (cfg.tree === "virtual") svgKey = "chevronRight";
+    r.appendChild(treeCell(svgKey, treeColor, cfg.tree !== "leaf"));
 
     const nameBox = cell(COL.NAME, null, "MIN");
     const nameInner = hHug();
@@ -619,7 +775,7 @@ async function main() {
     nameInner.counterAxisAlignItems = "CENTER";
     if (cfg.indent) nameInner.appendChild(spacer(cfg.indent, 1));
     const nameFont = cfg.nameItalic ? F.i : F.m;
-    const nameColor = cfg.nameColor || ((cfg.state === "disabled" || cfg.subLocked) ? C.textFade : C.text);
+    const nameColor = cfg.nameColor || ((cfg.state === "disabled" || cfg.subLocked) ? C.strokeMid : C.text);
     nameInner.appendChild(txt(cfg.name, nameFont, 12, nameColor));
     if (cfg.extraTargetChip) {
       nameInner.appendChild(chip(cfg.extraTargetChip, C.amber, 0.15));
@@ -628,7 +784,7 @@ async function main() {
     r.appendChild(nameBox);
 
     const pathBox = cell(COL.PATH, null, "MIN");
-    const pathColor = cfg.pathColor || (cfg.state === "missing" ? C.danger : (cfg.subLocked ? C.textFade : C.textDim));
+    const pathColor = cfg.pathColor || (cfg.state === "missing" ? C.danger : (cfg.subLocked ? C.strokeMid : C.textDim));
     const pathFont = cfg.pathItalic ? F.i : F.r;
     const pathInner = hHug();
     pathInner.itemSpacing = 4;
@@ -667,6 +823,8 @@ async function main() {
     actWrap.appendChild(actInner);
     r.appendChild(actWrap);
 
+    r.appendChild(labelBox);
+
     let rmGlyph = cfg.remove === false ? "" : "×";
     const rmText = txt(rmGlyph, F.r, 14, C.textDim);
     r.appendChild(cell(COL.RM, rmGlyph ? rmText : null));
@@ -697,7 +855,6 @@ async function main() {
     setFill(wrap, C.panelAlt, 1);
 
     const nameLabel = (opts && opts.nameSort) ? "NAME  " + opts.nameSort : "NAME  ↑";
-    wrap.appendChild(colHeaderCell(COL.LABEL, "LBL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.TREE, "", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.NAME, nameLabel, "MIN", (opts && opts.nameSort === "") ? C.textDim : C.accent));
     wrap.appendChild(colHeaderCell(COL.PATH, "PATH", "MIN"));
@@ -712,6 +869,8 @@ async function main() {
       wrap.appendChild(colHeaderCell(COL.DEL, "DEL", "CENTER"));
     }
     wrap.appendChild(colHeaderCell(COL.ACT, "ACTIONS", "MIN"));
+    // LBL sits between ACTIONS and the × remove slot (2026-04-21 layout).
+    wrap.appendChild(colHeaderCell(COL.LABEL, "LBL", "CENTER"));
     wrap.appendChild(colHeaderCell(COL.RM, "", "CENTER"));
     return wrap;
   }
@@ -749,8 +908,8 @@ async function main() {
     searchBox.counterAxisAlignItems = "CENTER";
     setFill(searchBox, C.canvas, 1);
     setStroke(searchBox, C.border, 1, 1);
-    searchBox.appendChild(txt("🔍", F.r, 11, C.textDim));
-    searchBox.appendChild(txt("Search watch folders…", F.r, 11, C.textFade));
+    searchBox.appendChild(loadIcon("search", C.textDim, 14));
+    searchBox.appendChild(txt("Search watch folders…", F.r, 11, C.textDim));
     wrap.appendChild(searchBox);
 
     // Optional "Show targets" toggle (guard 3)
@@ -871,8 +1030,8 @@ async function main() {
     setFill(f, C.panel, 1);
     f.appendChild(txt("status:", F.r, 11, C.textDim));
     f.appendChild(txt(label || "Ready", F.m, 11, C.text));
-    f.appendChild(spacer(1, 1)); f.children[f.children.length - 1].layoutGrow = 1;
-    f.appendChild(btnGhost("Save log"));
+    // "Save log" button migrated into §7 Settings → Advanced / Logs. Footer
+    // now carries just status text, leaving room for quieter chrome.
     return f;
   }
 
@@ -977,7 +1136,7 @@ async function main() {
   const titleSec = vSec(contentW);
   titleSec.itemSpacing = 8;
   titleSec.appendChild(txt("SheepDog — Panel v1.2 Concept", F.b, 36, C.white, 44, 1));
-  titleSec.appendChild(txt("STATE → row-bg tint · LBL leftmost · FLT flat-override · FLT border states · SUB=OFF subtree lockout · DEL danger-zone opt-in · sort auto-clear on drag · §7 Settings refined · 2026-04-20", F.r, 14, C.textDim, 20));
+  titleSec.appendChild(txt("Row bg calm (state system revamp TBD) · LBL by the × slot · FLT flat-override · FLT border states · SUB=OFF subtree lockout · DEL danger-zone opt-in · sort auto-clear on drag · unified Lucide icons · §7 Settings refined · 2026-04-21", F.r, 14, C.textDim, 20));
   titleSec.appendChild(divider(contentW, C.white, 0.08));
   root.appendChild(titleSec);
 
@@ -1011,9 +1170,9 @@ async function main() {
       sub: "on", rel: "off", seq: "off", flt: "off", eye: "on",
       label: C.labelCerulean,
       actions: [
-        { glyph: "↻", color: C.text },
-        { glyph: "⌕", color: C.text },
-        { glyph: "🧲", color: C.text },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
     },
     {
@@ -1022,9 +1181,9 @@ async function main() {
       sub: "inherited-on", rel: "inherited-off", seq: "on", flt: "inherited-off", eye: "inherited-on",
       label: null, labelInherited: true,
       actions: [
-        { glyph: "↻", color: C.text },
-        { glyph: "⌕", color: C.text },
-        { glyph: "🧲", color: C.text },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
     },
     {
@@ -1032,23 +1191,22 @@ async function main() {
       name: "RAW", path: "…/01_Video/RAW",
       sub: "inherited-on", rel: "inherited-off", seq: "inherited-on", flt: "inherited-off", eye: "inherited-on",
       label: null, labelInherited: true,
-      nameItalic: true, nameColor: C.textDim, pathItalic: true,
       actions: [
-        { glyph: "↻", color: C.text },
-        { glyph: "⌕", color: C.text },
-        { glyph: "🧲", color: C.text },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
       remove: false,
     },
     {
       indent: 18, state: "ok", tree: "collapsed",
       name: "02_Image", path: "…/03_Assets/02_Image",
-      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "off",
+      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
       label: C.labelForest,
       actions: [
-        { glyph: "↻", color: C.text },
-        { glyph: "⌕", color: C.text },
-        { glyph: "🧲", color: C.text },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
     },
     {
@@ -1057,9 +1215,9 @@ async function main() {
       sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
       label: null, labelInherited: true,
       actions: [
-        { glyph: "↻", color: C.text, opacity: 0.4 },
-        { glyph: "⌕", color: C.accent, highlight: true },
-        { glyph: "🧲", color: C.text, opacity: 0.4 },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
     },
     {
@@ -1068,9 +1226,9 @@ async function main() {
       sub: "on", rel: "off", seq: "off", flt: "off", eye: "on",
       label: C.labelMango,
       actions: [
-        { glyph: "↻", color: C.amber, highlight: true },
-        { glyph: "⌕", color: C.text },
-        { glyph: "🧲", color: C.text },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
     },
     {
@@ -1079,9 +1237,9 @@ async function main() {
       sub: "on", rel: "on", seq: "off", flt: "off", eye: "off",
       label: C.labelViolet,
       actions: [
-        { glyph: "↻", color: C.text },
-        { glyph: "⌕", color: C.text },
-        { glyph: "🧲", color: C.text },
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
       ],
     },
     {
@@ -1089,11 +1247,11 @@ async function main() {
       name: "_old_backup", path: "E:/archive/2024/FILM_old",
       sub: "disabled", rel: "disabled", seq: "disabled", flt: "disabled", eye: "disabled",
       label: null, labelInherited: true,
-      nameColor: C.textFade,
+      nameColor: C.strokeMid,
       actions: [
-        { glyph: "↻", color: C.text, opacity: 0.3 },
-        { glyph: "⌕", color: C.text, opacity: 0.3 },
-        { glyph: "🧲", color: C.text, opacity: 0.3 },
+        { glyph: "↻", color: C.strokeMid },
+        { glyph: "⌕", color: C.strokeMid },
+        { glyph: "🧲", color: C.strokeMid },
       ],
     },
   ];
@@ -1144,59 +1302,12 @@ async function main() {
       desc: "Ok, disabled, eye-closed → no tint. Behavioral: feedback only on deviation. Disabled = faded text. Eye-closed = 👁 action icon. No green state dot — default IS the signal." },
   ]));
 
-  ann.appendChild(annCard("Checkbox variants — inheritance visible at a glance", C.success, [
-    { demo: demoBox(24, 18, checkbox("on")),
-      title: "Overridden ON",
-      desc: "User explicitly ticked it. Solid fill. Wins over parent setting." },
-    { demo: demoBox(24, 18, checkbox("off")),
-      title: "Overridden OFF",
-      desc: "User explicitly unticked. Solid outline. Wins over parent." },
-    { demo: demoBox(24, 18, checkbox("inherited-on")),
-      title: "Inherited ON",
-      desc: "Value flows from nearest ancestor row with an override. Faded 35% opacity." },
-    { demo: demoBox(24, 18, checkbox("inherited-off")),
-      title: "Inherited OFF",
-      desc: "Same, from ancestor OFF. Faded outline." },
-    { demo: demoBox(24, 18, checkbox("cover")),
-      title: "Safety cover (locked)",
-      desc: "Matte gray fill = flip-up cover down. Click once → cover lifts (4s). Click again within window → applies. See §3 for full flow." },
-    { demo: demoBox(24, 18, checkbox("disabled")),
-      title: "Disabled (row off)",
-      desc: "Row's enabled=false greys out all toggles. Settings remembered, not lost." },
-    { demo: demoBox(24, 18, checkbox("on", true)),
-      title: "Overridden ON · SUB locked",
-      desc: "Descendant of a SUB=OFF ancestor. Shape preserved (user's override still stored), accent swapped to textDim to signal \"currently frozen\". Flipping parent's SUB back restores the blue." },
-    { demo: demoBox(24, 18, checkbox("inherited-on", true)),
-      title: "Inherited ON · SUB locked",
-      desc: "Same cascade, applied to an inherited value. Faded grey — preserves the \"this flows from somewhere\" reading while signalling inactivity." },
-  ]));
-
-  // Eye palette — parallel to checkbox() palette but rendered via lucide
-  // eye-open/eye-closed glyphs. Same axes: value (on/off) × source (override/
-  // inherited) × lock (none / ancestor-locked). Disabled = row-off.
-  ann.appendChild(annCard("Eye (AUTO-SYNC) variants — parallel to checkbox", C.accent, [
-    { demo: demoBox(24, 18, eyeToggle("on")),
-      title: "Overridden ON",
-      desc: "Auto-watch active on this folder. Eye-open, full accent — mirrors checkbox(\"on\")." },
-    { demo: demoBox(24, 18, eyeToggle("off")),
-      title: "Overridden OFF",
-      desc: "Auto-watch off. Eye-closed, calm borderStrong — still visible and manually syncable." },
-    { demo: demoBox(24, 18, eyeToggle("inherited-on")),
-      title: "Inherited ON",
-      desc: "Flows from an ancestor row (or global Auto Sync = ON). Eye-open, faded accent." },
-    { demo: demoBox(24, 18, eyeToggle("inherited-off")),
-      title: "Inherited OFF",
-      desc: "Same cascade, from ancestor or global OFF. Eye-closed, faded textDim." },
-    { demo: demoBox(24, 18, eyeToggle("disabled")),
-      title: "Disabled (row off)",
-      desc: "Row's enabled=false. Eye-closed, very muted textFade. Stored value remembered." },
-    { demo: demoBox(24, 18, eyeToggle("on", true)),
-      title: "Overridden ON · ancestor locked",
-      desc: "Descendant of a SUB=OFF ancestor. Shape preserved (eye-open), accent swapped to textDim — \"watching intent stored, currently frozen by ancestor\"." },
-    { demo: demoBox(24, 18, eyeToggle("inherited-on", true)),
-      title: "Inherited ON · ancestor locked",
-      desc: "Cascade + lock. Faded textDim eye-open — reads as \"flows from somewhere, but frozen right now\"." },
-  ]));
+  // Old "Checkbox variants — 4-tier presence gradient" and "Eye (AUTO-SYNC)
+  // variants" cards moved out of the ann column and replaced by the full
+  // state-taxonomy tables in SECTION 1.5 below. The new tables cover every
+  // (class, value) pair for both glyph families (including the asymmetric
+  // eye cascade and Safety Cover column) at Tabel.jsx-exact hex values,
+  // which the old annCards couldn't accommodate at 540 px width.
 
   // FLT-border demo — mini row-like swatch showing border state
   function fltBorderDemo(borderColor, borderOpacity) {
@@ -1212,9 +1323,6 @@ async function main() {
     { demo: demoBox(32, 20, calmTintDemo()),
       title: "Alt zebra fill",
       desc: "Every other calm row uses +3% brightness. State tints (red/amber) override zebra." },
-    { demo: demoBox(32, 20, txt("Italic", F.i, 11, C.textDim)),
-      title: "Virtual row",
-      desc: "Subfolder on disk, no record in JSON. Italic + muted. One click on any control materializes it." },
     { demo: demoBox(32, 20, labelDot(null)),
       title: "No label / disabled",
       desc: "Empty circle = user hasn't assigned a Premiere color label. Disabled row = label dot muted to 35%." },
@@ -1238,15 +1346,741 @@ async function main() {
   ann.appendChild(annCard("SUB=OFF subtree lockout", C.textDim, [
     { demo: demoBox(100, 18, lockoutStripDemo(["off", "off", "off", "off"], false)),
       title: "Parent — SUB unchecked (SOT)",
-      desc: "User explicitly turned SUB off. Checkbox stays solid-outline (active control, toggleable). Row itself stays calm — no lockout on parent." },
-    { demo: demoBox(100, 18, lockoutStripDemo(["inherited-off", "on", "inherited-off", "off"], true)),
-      title: "Descendants — stored values, frozen",
-      desc: "All 4 controls stay legible (their stored values remain visible) but accent is swapped to textDim. NAME/PATH dim to textFade. Flipping parent SUB back restores accent instantly." },
+      desc: "User explicitly turned SUB off. Checkbox shows accent outline (active control, toggleable). Row itself stays calm — no lockout on parent." },
+    { demo: demoBox(100, 18, lockoutStripDemo(["off", "off", "off", "off"], true)),
+      title: "Descendants — Locked OFF (parent's forced value)",
+      desc: "All 4 controls show parent's forced OFF (grey backing, «крышечка»). User's stored overrides preserved silently — hidden under the lock, restored instantly when parent's SUB flips back to ON. NAME/PATH dim to strokeMid." },
+  ]));
+
+  // IMPORTANT design note — sub-row × semantics unresolved.
+  // Uses C.danger accent (red border + dot) to signal deferred decision.
+  ann.appendChild(annCard("IMPORTANT — × on sub-rows, semantics unresolved.", C.danger, [
+    { demo: demoBox(32, 36, txt("×", F.b, 18, C.text)),
+      title: "Parent-row ×",
+      desc: "Remove watch folder record. Clean: JSON entry gone, bin stays untouched." },
+    { demo: demoBox(32, 36, txt("×", F.b, 18, C.danger)),
+      title: "Sub-row × — conflict",
+      desc: "Blacklist-inside-whitelist. Parent SUB=on says «include all cascade», × says «except this one». Requires persistent exclusion marker — otherwise watcher re-adds the folder on next scan via cascade." },
+    { demo: demoBox(32, 36, txt("(A)", F.s, 11, C.textDim)),
+      title: "Candidate A — excludedChildren array",
+      desc: "excludedChildren: [...] on parent JSON record. Needs a separate UI surface to show and restore excluded items (Settings → Excluded, or hidden section)." },
+    { demo: demoBox(32, 36, txt("(B)", F.s, 11, C.textDim)),
+      title: "Candidate B — tombstone record",
+      desc: "Tombstone JSON record for the sub with tombstoned: true flag. Row stays visible in §1 with strike-through or disabled icon, second × = restore. Apple-way closer to (B): on-place visibility, no hidden state. Watchtower likely does (A) with a hidden list." },
+    { demo: demoBox(32, 36, txt("—", F.r, 14, C.strokeMid)),
+      title: "Decision deferred",
+      desc: "Deferred until §1 layout is finalized." },
+  ]));
+
+  // IMPORTANT design note — bulk selection / multi-row operations unresolved.
+  // Uses C.danger accent (red border + dot) to signal deferred decision.
+  ann.appendChild(annCard("IMPORTANT — Bulk selection / multi-row operations, unresolved.", C.danger, [
+    { demo: demoBox(32, 36, txt("ctx", F.s, 10, C.textDim)),
+      title: "Context",
+      desc: "Autowatch tier model (Overridden / Inherited / Disabled, default = Inherited) covers the 90% case cleanly — most rows inherit, specific ones get overridden individually. But one rare-yet-real scenario breaks down without bulk primitives." },
+    { demo: demoBox(32, 36, txt("10×", F.b, 12, C.danger)),
+      title: "Scenario",
+      desc: "Parent autowatch = OFF, but 10 (or 100) specific child folders must be ON. Without multi-select, user clicks 10+ individual Override-ON gestures. Acceptable for 2–3 rows, unworkable at scale. Not Apple-grade." },
+    { demo: demoBox(32, 36, txt("…", F.r, 18, C.textDim)),
+      title: "Related cases",
+      desc: "Same gap surfaces for: applying LBL to a batch, setting FLT on a group, resetting all children under X to Inherited, bulk × (touches the unresolved sub-row × question)." },
+    { demo: demoBox(32, 36, txt("⌘", F.r, 16, C.textDim)),
+      title: "Precedent",
+      desc: "Finder multi-select (click / Cmd+click / Shift+click range). Premiere bin multi-select. Both use OS-standard modifier keys — no custom gestures." },
+    { demo: demoBox(32, 36, txt("v1.3", F.s, 10, C.textDim)),
+      title: "Proposed primitives (v1.3+, not MVP)",
+      desc: "Per-row selection state. Modifier-key multi-select in row chrome. Bulk-action toolbar surfacing above/below table when selection is non-empty. Operations: toggle tier, assign LBL, remove, reset-to-inherited." },
+    { demo: demoBox(32, 36, txt("—", F.r, 14, C.strokeMid)),
+      title: "Deferred",
+      desc: "Visual design of selection indicator. Conflict resolution for heterogeneous multi-selections (some ON, some OFF — what does bulk toggle produce? One-click uniform target, or 3-state indeterminate + confirm?)." },
   ]));
 
   s1Row.appendChild(ann);
   s1.appendChild(s1Row);
   root.appendChild(s1);
+
+  // ==================================================
+  // SECTION 1.5 — State taxonomy (checkbox + eye) — 2026-04-20
+  //
+  // Full legend of every (class, value) pair across both glyph families.
+  // Replaces the old "Checkbox variants / Eye variants" annCards that used
+  // to live in Section 1's right column.
+  //
+  // Two tables in one section:
+  //   1. Checkbox taxonomy — DEL / SUB column glyphs (SYMMETRIC cascade).
+  //   2. Eye taxonomy     — Eye column glyphs (ASYMMETRIC cascade — open eye
+  //                         cascades as HARD LOCK, closed eye as SOFT INHERIT;
+  //                         Inherited has only OFF, Locked has only ON).
+  //
+  // Ported verbatim from figma-sheepdog-checkbox-variants.js. All helpers,
+  // rows, subtitles and design notes live inside an IIFE so the taxonomy
+  // namespace (chk, eye, legendRow, buildTable, coverStripCell…) never
+  // collides with the main panel's checkbox() / eyeToggle() / borderCountdown.
+  //
+  // Key visual rules (full rationale in variants.js banner):
+  //   • Solid hex palette — Locked OFF has the SAME visible backMid fill as
+  //     Locked ON, not a faint 18 % crack.
+  //   • Eye has NO container chrome, ever. Class signal lives inside the
+  //     glyph via (1) outline colour on every stroke, (2) optional body
+  //     «подложка» on the body path (Locked ON / Disabled+Locked ON), and
+  //     (3) optional dashPattern on the body path (every Disabled tier).
+  //     Pupil and lashes stay solid so the silhouette still reads as an eye.
+  //   • Safety Cover applies wherever the cell accepts clicks — excluded
+  //     from Locked / Disabled+Locked (source owns the value). Cover is red
+  //     ONLY during the armed countdown.
+  // ==================================================
+  const sTax = vSec(contentW);
+  sTax.itemSpacing = 16;
+  sTax.appendChild(sectionTitle(
+    "1.5. State taxonomy — palette · checkbox · eye · icon button",
+    "Opens with the 10-token palette SOT — every colour used below is a lookup into that card, not a fresh pick. Then every (class, value) pair for both glyph families with the Safety Cover overlay, and the icon-button state ladder that inherits from the same two workhorse greys. Symmetric cascade for checkbox, asymmetric for eye (N/A pairs render as faded em-dash). Button DISABLED = strokeMid, REST / HOVER / PRESSED all = borderBright; only the bg fill separates the last three.",
+    contentW
+  ));
+
+  const taxBlock = (function() {
+    // ---------- Taxonomy palette — solid hex from Tabel.jsx ----------
+    // Local to avoid disturbing the main panel's C (which uses text/strokeMid/
+    // borderStrong etc. — different names, overlapping meanings).
+    // 10 content tokens (panel/border are structural and not in the SOT card):
+    //   backDim, backMid      — 2 ladder steps for Locked backing surfaces
+    //   strokeMid             — workhorse «inactive»  (Disabled/Locked stroke,
+    //                           DISABLED button icon, Locked ON ✓, N/A em-dash)
+    //   borderBright          — workhorse «bright»    (Normal-OFF stroke,
+    //                           primary text, REST/HOVER/PRESSED button icon)
+    //   textDim               — secondary text hierarchy (column headers)
+    //   white                 — Overridden / Inherited ON ✓; HOVER/PRESSED bg tint
+    //   accent/Fill/Edge      — Overridden → Inherited ladder (3 steps)
+    //   danger                — Safety Cover armed window
+    // Everything else (textLite, textGhost, lockedCheck) got absorbed when
+    // the ~3–7% luminance delta turned out to be a palette bug, not a signal.
+    const Ct = {
+      panel:        { r: 0.145, g: 0.145, b: 0.157 },
+      border:       { r: 0.302, g: 0.302, b: 0.322 },
+      textDim:      { r: 0.600, g: 0.600, b: 0.631 },
+      borderBright: { r: 0.843, g: 0.843, b: 0.855 },
+      strokeMid:    { r: 0.486, g: 0.486, b: 0.514 },
+      backMid:      { r: 0.294, g: 0.294, b: 0.306 },
+      backDim:      { r: 0.196, g: 0.196, b: 0.206 },
+      accent:       { r: 0.078, g: 0.471, b: 0.949 },
+      accentFill:   { r: 0.122, g: 0.259, b: 0.431 },
+      accentEdge:   { r: 0.118, g: 0.290, b: 0.514 },
+      danger:       { r: 0.961, g: 0.322, b: 0.380 },
+      white:        { r: 1, g: 1, b: 1 },
+    };
+
+    // ---------- chk(cls, value) — 4-tier checkbox taxonomy ----------
+    function chk(cls, value) {
+      const f = figma.createFrame();
+      f.resize(14, 14);
+      f.cornerRadius = 3;
+      function center() {
+        f.layoutMode = "HORIZONTAL";
+        f.layoutSizingHorizontal = "FIXED";
+        f.layoutSizingVertical = "FIXED";
+        f.primaryAxisAlignItems = "CENTER";
+        f.counterAxisAlignItems = "CENTER";
+      }
+      if (cls === "overridden" && value === "on") {
+        setFill(f, Ct.accent, 1); setStroke(f, Ct.accent, 1, 1);
+        center(); f.appendChild(txt("✓", F.b, 10, Ct.white));
+      } else if (cls === "overridden" && value === "off") {
+        f.fills = []; setStroke(f, Ct.borderBright, 1, 1);
+      } else if (cls === "inherited" && value === "on") {
+        setFill(f, Ct.accentFill, 1); setStroke(f, Ct.accentEdge, 1, 1);
+        center(); f.appendChild(txt("✓", F.m, 9, Ct.white));
+      } else if (cls === "inherited" && value === "off") {
+        f.fills = []; setStroke(f, Ct.strokeMid, 1, 1);
+      } else if (cls === "locked" && value === "on") {
+        setFill(f, Ct.backMid, 1); setStroke(f, Ct.strokeMid, 1, 1);
+        center(); f.appendChild(txt("✓", F.m, 9, Ct.strokeMid));
+      } else if (cls === "locked" && value === "off") {
+        setFill(f, Ct.backMid, 1); setStroke(f, Ct.strokeMid, 1, 1);
+      } else if (cls === "disabled" && value === "on") {
+        f.fills = []; setStroke(f, Ct.strokeMid, 1, 1);
+        f.dashPattern = [2, 2];
+        center(); f.appendChild(txt("✓", F.m, 9, Ct.strokeMid));
+      } else if (cls === "disabled" && value === "off") {
+        f.fills = []; setStroke(f, Ct.strokeMid, 1, 1);
+        f.dashPattern = [2, 2];
+      } else if (cls === "disabled-inherited" && value === "on") {
+        f.fills = []; setStroke(f, Ct.backMid, 1, 1);
+        f.dashPattern = [2, 2];
+        center(); f.appendChild(txt("✓", F.m, 9, Ct.backMid));
+      } else if (cls === "disabled-inherited" && value === "off") {
+        f.fills = []; setStroke(f, Ct.backMid, 1, 1);
+        f.dashPattern = [2, 2];
+      } else if (cls === "disabled-locked" && value === "on") {
+        setFill(f, Ct.backDim, 1); setStroke(f, Ct.backMid, 1, 1);
+        f.dashPattern = [2, 2];
+        center(); f.appendChild(txt("✓", F.m, 9, Ct.backMid));
+      } else if (cls === "disabled-locked" && value === "off") {
+        setFill(f, Ct.backDim, 1); setStroke(f, Ct.backMid, 1, 1);
+        f.dashPattern = [2, 2];
+      }
+      return f;
+    }
+
+    // ---------- eye(cls, value) — NO container chrome ----------
+    function eye(cls, value) {
+      const wrap = figma.createFrame();
+      wrap.resize(20, 20);
+      wrap.layoutMode = "HORIZONTAL";
+      wrap.layoutSizingHorizontal = "FIXED"; wrap.layoutSizingVertical = "FIXED";
+      wrap.primaryAxisAlignItems = "CENTER"; wrap.counterAxisAlignItems = "CENTER";
+      wrap.fills = [];
+      const gs = 14;
+      let glyph, color, backing = null, dashed = false;
+      if (cls === "overridden" && value === "on") {
+        glyph = "eye"; color = Ct.accent;
+      } else if (cls === "overridden" && value === "off") {
+        glyph = "eyeClosed"; color = Ct.borderBright;
+      } else if (cls === "inherited" && value === "on") {
+        glyph = "eye"; color = Ct.strokeMid;
+      } else if (cls === "inherited" && value === "off") {
+        glyph = "eyeClosed"; color = Ct.strokeMid;
+      } else if (cls === "locked" && value === "on") {
+        glyph = "eye"; color = Ct.strokeMid; backing = Ct.backMid;
+      } else if (cls === "disabled" && value === "on") {
+        glyph = "eye"; color = Ct.strokeMid; dashed = true;
+      } else if (cls === "disabled" && value === "off") {
+        glyph = "eyeClosed"; color = Ct.strokeMid; dashed = true;
+      } else if (cls === "disabled-inherited" && value === "on") {
+        glyph = "eye"; color = Ct.strokeMid; dashed = true;
+      } else if (cls === "disabled-inherited" && value === "off") {
+        glyph = "eyeClosed"; color = Ct.backMid; dashed = true;
+      } else if (cls === "disabled-locked" && value === "on") {
+        glyph = "eye"; color = Ct.backMid; backing = Ct.backDim; dashed = true;
+      }
+      const g = loadIcon(glyph, color, gs);
+      if (backing) applyBodyBacking(g, glyph, backing);
+      if (dashed)  applyBodyDash(g, glyph);
+      wrap.appendChild(g);
+      return wrap;
+    }
+
+    // eye = [outerBody, pupil]; eyeClosed = [lash, eyelidArc, lash, lash, lash]
+    function bodyChildIndex(glyph) { return glyph === "eyeClosed" ? 1 : 0; }
+
+    function applyBodyBacking(node, glyph, color) {
+      if (!("children" in node) || !Array.isArray(node.children)) return;
+      const body = node.children[bodyChildIndex(glyph)];
+      if (body && "fills" in body) {
+        body.fills = [{ type: "SOLID", color: color, opacity: 1 }];
+      }
+    }
+
+    function applyBodyDash(node, glyph) {
+      if (!("children" in node) || !Array.isArray(node.children)) return;
+      const body = node.children[bodyChildIndex(glyph)];
+      if (body && "dashPattern" in body) {
+        body.dashPattern = [1.5, 1.5];
+      }
+    }
+
+    function naCell() { return txt("—", F.r, 12, Ct.strokeMid); }
+
+    // ---------- Safety Cover Countdown (12×12 taxonomy-sized) ----------
+    // Reuses the file-level perimeterPathCCW / roundedRectPerimeter (trimmed
+    // path model). Distinct from the main-panel borderCountdown() — that
+    // one is blue-on-gray for the §3 demo, this one is red-on-gray for the
+    // taxonomy legend, and sized to fit a 14 px cell.
+    function covCountdown(progress01) {
+      const size = 12, r = 3, sw = 1.25;
+      const wrap = figma.createFrame();
+      wrap.resize(size, size);
+      wrap.fills = [];
+
+      const base = figma.createFrame();
+      base.resize(size, size);
+      base.cornerRadius = r;
+      base.fills = [];
+      setStroke(base, Ct.border, 1, sw);
+      wrap.appendChild(base);
+
+      const inset = 1;
+      const inner = size - 2 * inset;
+      const overlay = figma.createVector();
+      overlay.resize(inner, inner);
+      overlay.vectorPaths = [{
+        windingRule: "NONE",
+        data: perimeterPathCCW(inner, inner, Math.max(1, r - inset), progress01),
+      }];
+      overlay.strokes = [{ type: "SOLID", color: Ct.danger }];
+      overlay.strokeWeight = sw;
+      overlay.strokeCap = "ROUND";
+      overlay.strokeJoin = "ROUND";
+      overlay.fills = [];
+      wrap.appendChild(overlay);
+      overlay.relativeTransform = [[-1, 0, inset + inner], [0, 1, inset]];
+      return wrap;
+    }
+
+    function coverStripCell() {
+      const strip = hHug();
+      strip.itemSpacing = 4;
+      strip.counterAxisAlignItems = "CENTER";
+      strip.primaryAxisAlignItems = "CENTER";
+      strip.appendChild(covCountdown(0.95));
+      strip.appendChild(covCountdown(0.50));
+      strip.appendChild(covCountdown(0.15));
+      return strip;
+    }
+
+    // ---------- Table builders ----------
+    const W_CELL_COL = 48;
+    const W_NAME = 180;
+    const W_DESC = 260;
+    const COL_W = W_CELL_COL * 2 + W_NAME + W_DESC + 16;
+
+    function headerRow() {
+      const row = hSec(COL_W);
+      row.itemSpacing = 16;
+      row.paddingTop = 6; row.paddingBottom = 6;
+      row.counterAxisAlignItems = "CENTER";
+
+      const onCell = hSec(W_CELL_COL); onCell.primaryAxisAlignItems = "CENTER";
+      onCell.appendChild(txt("ON", F.s, 10, Ct.textDim));
+      row.appendChild(onCell);
+
+      const offCell = hSec(W_CELL_COL); offCell.primaryAxisAlignItems = "CENTER";
+      offCell.appendChild(txt("OFF", F.s, 10, Ct.textDim));
+      row.appendChild(offCell);
+
+      const nameCell = hSec(W_NAME);
+      nameCell.appendChild(txt("CLASS", F.s, 10, Ct.textDim));
+      row.appendChild(nameCell);
+
+      const descCell = hSec(W_DESC);
+      descCell.appendChild(txt("MEANING", F.s, 10, Ct.textDim));
+      row.appendChild(descCell);
+
+      return row;
+    }
+
+    function legendRow(cellOn, cellOff, name, desc) {
+      const row = hSec(COL_W);
+      row.itemSpacing = 16;
+      row.paddingTop = 10; row.paddingBottom = 10;
+      row.counterAxisAlignItems = "CENTER";
+
+      const onCell = hSec(W_CELL_COL);
+      onCell.primaryAxisAlignItems = "CENTER";
+      onCell.counterAxisAlignItems = "CENTER";
+      onCell.appendChild(cellOn);
+      row.appendChild(onCell);
+
+      const offCell = hSec(W_CELL_COL);
+      offCell.primaryAxisAlignItems = "CENTER";
+      offCell.counterAxisAlignItems = "CENTER";
+      offCell.appendChild(cellOff);
+      row.appendChild(offCell);
+
+      const nameCol = vSec(W_NAME);
+      nameCol.appendChild(txt(name, F.s, 12, Ct.borderBright));
+      row.appendChild(nameCol);
+
+      const descCol = vSec(W_DESC);
+      descCol.appendChild(txtW(desc, F.r, 11, Ct.textDim, W_DESC, 15));
+      row.appendChild(descCol);
+
+      return row;
+    }
+
+    function buildTable(title, subtitle, rowSpecs, noteText) {
+      const card = figma.createFrame();
+      card.resize(COL_W + 48, 10);
+      card.layoutMode = "VERTICAL";
+      card.layoutSizingHorizontal = "FIXED";
+      card.layoutSizingVertical = "HUG";
+      card.paddingTop = 24; card.paddingBottom = 24;
+      card.paddingLeft = 24; card.paddingRight = 24;
+      card.itemSpacing = 0;
+      card.cornerRadius = 12;
+      setFill(card, Ct.panel, 1);
+      setStroke(card, Ct.border, 1, 1);
+
+      card.appendChild(txt(title, F.b, 16, Ct.borderBright));
+      card.appendChild(spacer(10, 4));
+      card.appendChild(txtW(subtitle, F.r, 11, Ct.textDim, COL_W, 16));
+      card.appendChild(spacer(10, 16));
+
+      card.appendChild(headerRow());
+      card.appendChild(divider(COL_W, Ct.border, 1));
+
+      for (var i = 0; i < rowSpecs.length; i++) {
+        card.appendChild(rowSpecs[i]);
+        if (i < rowSpecs.length - 1) card.appendChild(divider(COL_W, Ct.border, 0.5));
+      }
+
+      if (noteText) {
+        card.appendChild(spacer(10, 16));
+        card.appendChild(divider(COL_W, Ct.border, 0.8));
+        card.appendChild(spacer(10, 12));
+        const noteFrame = vSec(COL_W);
+        noteFrame.appendChild(txt("Design note", F.s, 10, Ct.textDim));
+        noteFrame.appendChild(spacer(10, 6));
+        noteFrame.appendChild(txtW(noteText, F.r, 11, Ct.textDim, COL_W, 16));
+        card.appendChild(noteFrame);
+      }
+      return card;
+    }
+
+    // ---------- Checkbox rows ----------
+    const chkRows = [
+      legendRow(
+        chk("overridden", "on"), chk("overridden", "off"),
+        "Normal",
+        "User explicitly set this cell. Full-saturation accent on ON; neutral bright stroke on OFF. Wins over ancestor — any cascade from above stops here."
+      ),
+      legendRow(
+        chk("inherited", "on"), chk("inherited", "off"),
+        "Inherited",
+        "Value flows from nearest ancestor override. Dim accent on ON, neutral dim stroke on OFF. Clickable — click promotes this cell to Normal (pins the value here, breaks further inheritance)."
+      ),
+      legendRow(
+        chk("locked", "on"), chk("locked", "off"),
+        "Locked",
+        "Value forced by cascade-lock source (SUB=OFF on an ancestor). Neutral grey — no accent tint. OFF has a subtle backing («крышечка»), distinguishing Locked OFF from Inherited OFF (empty) and Disabled OFF (dashed). Not clickable — unlock only at the source."
+      ),
+      legendRow(
+        chk("disabled", "on"), chk("disabled", "off"),
+        "Disabled (row off)",
+        "Row is functionally off — media missing or scan running. Dashed border + no backing in both states. Clicks are still accepted and mutate stored state — the change just has no real-world effect until the row re-enables. Safety Cover applies here specifically to remind the user they're touching something while the row is dead."
+      ),
+      legendRow(
+        chk("disabled-inherited", "on"), chk("disabled-inherited", "off"),
+        "Disabled + Inherited (row off)",
+        "Row is off, and the stored value itself is Inherited from an ancestor. Dashed border (row-off signal) with a dim-accent check glyph on ON (lineage hint). Clicks are still accepted and mutate the cell's local override — when the row re-enables, that local override takes effect (promoting to Normal) if set."
+      ),
+      legendRow(
+        chk("disabled-locked", "on"), chk("disabled-locked", "off"),
+        "Disabled + Locked (row off)",
+        "Row is off, and the stored value is cascade-locked from above. Dashed border with the grey Locked «подложка» peeking through. Not clickable even while the row is off — the Locked layer wins over the Disabled click-acceptance. No Safety Cover (nothing to gate)."
+      ),
+      legendRow(
+        txt("N/A", F.m, 10, Ct.strokeMid), coverStripCell(),
+        "Safety Cover Countdown",
+        "Orthogonal overlay — not a state class. Applies wherever the cell accepts clicks: Normal, Inherited, Disabled, Disabled+Inherited (4 of 6 rows above). Excluded from Locked and Disabled+Locked — source owns the value, so a 2-click gate has nothing to protect. Mechanic: first click arms (stroke turns red), countdown drains over ~3s, second click within the window commits. Timeout re-locks. Red appears ONLY during the armed countdown."
+      ),
+    ];
+
+    const chkTable = buildTable(
+      "Checkbox state taxonomy + Safety Cover",
+      "Base classes: Normal → Inherited → Locked → Disabled. Compound rows (Disabled+Inherited, Disabled+Locked) show how Disabled composes orthogonally with the cascade class. SUB cascade is SYMMETRIC — SUB=OFF on an ancestor locks both ON and OFF values in descendants. Only Normal ON and Inherited ON carry accent — every OFF and every grey-tier cell is pure neutral.",
+      chkRows,
+      "Works at 14px because distinguishing signals are structural (fill presence, dash pattern, backing), not glyph-based. Safety Cover is red-only during the armed window — activation signal, not column chrome. This keeps red desensitization-free: the user sees red only when something is about to happen."
+    );
+
+    // ---------- Eye rows ----------
+    const eyeRows = [
+      legendRow(
+        eye("overridden", "on"), eye("overridden", "off"),
+        "Normal",
+        "User explicitly set eye state. Bare glyph — no container chrome. Full-saturation accent eye-open on ON; calm neutral borderBright eye-closed on OFF. Wins over ancestor cascade."
+      ),
+      legendRow(
+        eye("inherited", "on"), eye("inherited", "off"),
+        "Inherited",
+        "Ancestor cascades its value (open or closed) as SOFT INHERIT — descendants echo it, but may individually override to the opposite. Bare glyph + strokeMid outline, no подложка. Both ON and OFF are valid. Clickable — click promotes to Normal (the cell pins its own value)."
+      ),
+      legendRow(
+        eye("locked", "on"), naCell(),
+        "Locked",
+        "**Reserved — mechanism preserved for future use. Not produced by current cascade.** Open ancestor would cascade as HARD LOCK (forced open, not clickable) if this tier were activated. Bare eye-open glyph with strokeMid outline and a backMid «подложка» painted inside the eye body path — the fill is the lock signal, not a container box. Kept in engine for potential future need (e.g. admin-locked shared libraries). No OFF variant."
+      ),
+      legendRow(
+        eye("disabled", "on"), eye("disabled", "off"),
+        "Disabled (row off)",
+        "Row is functionally off — media missing or scan running. Bare glyph with muted strokeMid outline in both ON and OFF. The body path alone is dashed (outer almond on the open eye, eyelid arc on the closed eye) — pupil and lashes stay solid so the silhouette still reads as an eye. No container box: the dashed body is the row-off signal. Clicks are still accepted and mutate stored state; the change just has no real-world effect until the row re-enables. Safety Cover applies here to remind the user they're touching something while the row is dead."
+      ),
+      legendRow(
+        eye("disabled-inherited", "on"), eye("disabled-inherited", "off"),
+        "Disabled + Inherited (row off)",
+        "Row is off AND the stored value is Inherited from an ancestor. Bare glyph, strokeMid outline, dashed body, no подложка — distinguishes from Disabled+Locked (which has a backDim body fill). Both ON and OFF are valid. Clicks are still accepted — they set a local override that takes effect when the row re-enables."
+      ),
+      legendRow(
+        eye("disabled-locked", "on"), naCell(),
+        "Disabled + Locked (row off)",
+        "**Reserved — mechanism preserved for future use. Not produced by current cascade.** Composite of Disabled (row off) + Locked (hard-lock from ancestor). Bare eye-open glyph, backMid outline, backDim «подложка» painted in the body path, and the body path is dashed while the pupil stays solid — darker echo of plain Locked ON plus the Disabled dashed-body marker. Not clickable even while the row is off — Locked wins. No OFF variant."
+      ),
+      legendRow(
+        txt("N/A", F.m, 10, Ct.strokeMid), coverStripCell(),
+        "Safety Cover Countdown",
+        "Same overlay mechanic as the checkbox table — applies wherever the cell accepts clicks: Normal (both ON and OFF), Inherited (both ON and OFF), Disabled (both ON and OFF), Disabled+Inherited (both ON and OFF). Excluded from Locked ON and Disabled+Locked ON (reserved tiers — source owns the value). The cover wraps the 20×20 click target of the cell. First click arms, drains over ~3s, second click commits; timeout re-locks. Red only during the armed countdown."
+      ),
+    ];
+
+    const eyeTable = buildTable(
+      "Eye state taxonomy + Safety Cover",
+      "Same base classes as the checkbox table (Normal / Inherited / Disabled + Disabled+Inherited compound). Cascade is SYMMETRIC through Inherited — both open and closed ancestor eye cascade as Inherited (soft), descendants may individually override. Locked and Disabled+Locked tiers remain in the engine as reserved mechanisms (admin/shared-library scenarios) but are not produced by current cascade logic. Eye glyphs carry no container chrome — class signal lives inside the glyph via in-path stylings: outline colour, optional body «подложка» (Locked tiers only), optional dashPattern (Disabled tiers). Pupil and lashes always solid. Only Normal ON carries accent.",
+      eyeRows,
+      "Symmetry matches the checkbox table: cascade is uniform across value (open/closed), user always retains override on descendant. Locked tiers kept in engine as opt-in reserved mechanism — today no call-site produces them. Same red-during-armed-window rule applies; reserved Locked tiers exclude cover (source owns value)."
+    );
+
+    // ---------- Icon button states — Adobe parity ----------
+    // Sized to match chk+eye row width (1224px) so the inheritance is visible:
+    // the DISABLED/REST icon colours are literally the same hex values used by
+    // the Disabled and Normal-OFF rows in the checkbox table above.
+    const W_BTN_TABLE = 2 * (COL_W + 48) + 24; // 1224
+    const W_BTN_INNER = W_BTN_TABLE - 48;       // 1176 (card padding 24+24)
+    const W_BTN_ICON = 44;
+    const W_BTN_STATE = 76;
+    const W_BTN_NAME = 160;
+    const W_BTN_MEANING = W_BTN_INNER - W_BTN_ICON - 4 * W_BTN_STATE - W_BTN_NAME - 16 * 6;
+
+    function btnStateCell(svgKey, iconColor, bgColor, bgOpacity, dashed) {
+      const f = figma.createFrame();
+      f.resize(22, 22);
+      f.cornerRadius = 3;
+      f.layoutMode = "HORIZONTAL";
+      f.layoutSizingHorizontal = "FIXED";
+      f.layoutSizingVertical = "FIXED";
+      f.primaryAxisAlignItems = "CENTER";
+      f.counterAxisAlignItems = "CENTER";
+      if (bgColor) setFill(f, bgColor, bgOpacity != null ? bgOpacity : 1);
+      else f.fills = [];
+      const g = loadIcon(svgKey, iconColor, 14);
+      // For the eye glyph in DISABLED state we dash the body path to match
+      // the eye-taxonomy SOT above (every Disabled tier dashes the body).
+      // No-op on non-eye glyphs (their children lack the body/lash split).
+      if (dashed && (svgKey === "eye" || svgKey === "eyeClosed")) {
+        applyBodyDash(g, svgKey);
+      }
+      f.appendChild(g);
+      return f;
+    }
+
+    function btnCol(w, child) {
+      const c = hSec(w);
+      c.primaryAxisAlignItems = "CENTER";
+      c.counterAxisAlignItems = "CENTER";
+      c.appendChild(child);
+      return c;
+    }
+
+    function btnHeader() {
+      const r = hSec(W_BTN_INNER);
+      r.itemSpacing = 16;
+      r.paddingTop = 6; r.paddingBottom = 6;
+      r.counterAxisAlignItems = "CENTER";
+      r.appendChild(btnCol(W_BTN_ICON, spacer(1, 1)));
+      const labels = ["DISABLED", "REST", "HOVER", "PRESSED"];
+      for (var li = 0; li < labels.length; li++) {
+        r.appendChild(btnCol(W_BTN_STATE, txt(labels[li], F.s, 10, Ct.textDim, undefined, 0.5)));
+      }
+      const nameCol = hSec(W_BTN_NAME);
+      nameCol.appendChild(txt("CLASS", F.s, 10, Ct.textDim));
+      r.appendChild(nameCol);
+      const descCol = hSec(W_BTN_MEANING);
+      descCol.appendChild(txt("MEANING", F.s, 10, Ct.textDim));
+      r.appendChild(descCol);
+      return r;
+    }
+
+    function btnRow(spec) {
+      const r = hSec(W_BTN_INNER);
+      r.itemSpacing = 16;
+      r.paddingTop = 10; r.paddingBottom = 10;
+      r.counterAxisAlignItems = "CENTER";
+      // Dim icon reference (leftmost — which glyph this row is about)
+      r.appendChild(btnCol(W_BTN_ICON, loadIcon(spec.key, Ct.textDim, 14)));
+      // DISABLED — strokeMid icon, matches Disabled checkbox stroke (#7C7C83).
+      // Eye row adds dashPattern on the body path to mirror the eye-taxonomy
+      // SOT (every Disabled eye tier is dashed — solid stroke would diverge).
+      const isEye = spec.key === "eye";
+      r.appendChild(btnCol(W_BTN_STATE, btnStateCell(spec.key, Ct.strokeMid, null, null, isEye)));
+      // REST — borderBright icon, matches Normal-OFF checkbox stroke (#D7D7DA)
+      r.appendChild(btnCol(W_BTN_STATE, btnStateCell(spec.key, Ct.borderBright, null, null)));
+      // HOVER — icon stays at borderBright (same hex as REST); the state
+      // signal lives entirely in the frame bg rising to white@8%. Lifting the
+      // icon as well would double-signal and force a third icon hex into the
+      // palette for a barely-perceptible delta — Apple-rule violation.
+      r.appendChild(btnCol(W_BTN_STATE, btnStateCell(spec.key, Ct.borderBright, Ct.white, 0.08)));
+      // PRESSED — same icon hex, bg deepens to white@12%. One more tick.
+      r.appendChild(btnCol(W_BTN_STATE, btnStateCell(spec.key, Ct.borderBright, Ct.white, 0.12)));
+
+      const nameCol = vSec(W_BTN_NAME);
+      nameCol.appendChild(txt(spec.name, F.s, 12, Ct.borderBright));
+      r.appendChild(nameCol);
+
+      const descCol = vSec(W_BTN_MEANING);
+      descCol.appendChild(txtW(spec.desc, F.r, 11, Ct.textDim, W_BTN_MEANING, 15));
+      r.appendChild(descCol);
+      return r;
+    }
+
+    const btnIcons = [
+      { key: "refresh", name: "Refresh",
+        desc: "Manual resync — rescan the watched folder and push any new files through the queue. Action button: no toggle state." },
+      { key: "search", name: "Reveal",
+        desc: "Open the watched path in the OS file browser. Action button: fires and returns." },
+      { key: "magnet", name: "Attach",
+        desc: "Snap to / attach on a target bin (v1.3+ drag affordance). Action button: no persistent state." },
+      { key: "eye", name: "Eye (dual nature)",
+        desc: "Both a toggle (like the checkbox family) AND an action button. Its ON/OFF lives in the eye taxonomy above — this row shows only the button-layer states (disabled/rest/hover/pressed), which apply the same way regardless of the eye's current toggle value." },
+    ];
+
+    const btnCard = figma.createFrame();
+    btnCard.resize(W_BTN_TABLE, 10);
+    btnCard.layoutMode = "VERTICAL";
+    btnCard.layoutSizingHorizontal = "FIXED";
+    btnCard.layoutSizingVertical = "HUG";
+    btnCard.paddingTop = 24; btnCard.paddingBottom = 24;
+    btnCard.paddingLeft = 24; btnCard.paddingRight = 24;
+    btnCard.itemSpacing = 0;
+    btnCard.cornerRadius = 12;
+    setFill(btnCard, Ct.panel, 1);
+    setStroke(btnCard, Ct.border, 1, 1);
+
+    btnCard.appendChild(txt("Icon button states — Adobe parity", F.b, 16, Ct.borderBright));
+    btnCard.appendChild(spacer(10, 4));
+    btnCard.appendChild(txtW(
+      "Only TWO icon hex values across all four states. DISABLED = TC.strokeMid (#7C7C83 — same as every Disabled/Locked checkbox stroke). REST / HOVER / PRESSED all share TC.borderBright (#D7D7DA — same as every Normal-OFF checkbox stroke). HOVER and PRESSED don't touch the icon colour at all; they signal exclusively through the bg fill (white@8% and white@12%). This is deliberate: if the icon also shifted, we'd introduce a third near-white hex into the palette for a delta the eye barely catches — and we'd lose the Apple rule «pick the colour once, inherit everywhere». No ACTIVE column — action buttons don't hold state; the eye's toggle-ON visual is owned by the eye table above. Eye DISABLED additionally carries a dashed body path (same rule as every Disabled eye in the taxonomy) — solid stroke there would diverge from SOT.",
+      F.r, 11, Ct.textDim, W_BTN_INNER, 16
+    ));
+    btnCard.appendChild(spacer(10, 16));
+    btnCard.appendChild(btnHeader());
+    btnCard.appendChild(divider(W_BTN_INNER, Ct.border, 1));
+    for (var bi = 0; bi < btnIcons.length; bi++) {
+      btnCard.appendChild(btnRow(btnIcons[bi]));
+      if (bi < btnIcons.length - 1) btnCard.appendChild(divider(W_BTN_INNER, Ct.border, 0.5));
+    }
+    btnCard.appendChild(spacer(10, 16));
+    btnCard.appendChild(divider(W_BTN_INNER, Ct.border, 0.8));
+    btnCard.appendChild(spacer(10, 12));
+    const btnNote = vSec(W_BTN_INNER);
+    btnNote.appendChild(txt("Design note", F.s, 10, Ct.textDim));
+    btnNote.appendChild(spacer(10, 6));
+    btnNote.appendChild(txtW(
+      "Transitions are instant — no opacity animation. The entire ladder reuses exactly two icon hex values from the palette card above (strokeMid for DISABLED, borderBright for the other three), so «button colour» is not a decision — it's a lookup. HOVER and PRESSED carry no icon-colour delta; their state signal is owned by the bg fill (white@8% / white@12%). The bg percentages themselves are the only button-specific tokens in the doc, and they exist purely because the cascade taxonomy has no Hover/Pressed tier to inherit from — a pure Adobe-parity fallback, kept as narrow as possible.",
+      F.r, 11, Ct.textDim, W_BTN_INNER, 16
+    ));
+    btnCard.appendChild(btnNote);
+
+    // ---------- Palette — single source of truth ----------
+    // Deterministic token grid that anchors the rest of §1.5. Every checkbox,
+    // eye glyph, button icon, and text in the doc is a lookup into this card.
+    // Apple rule: pick the colour once, inherit everywhere.
+    const W_PAL_TABLE = W_BTN_TABLE;       // 1224 — matches btnCard width
+    const W_PAL_INNER = W_BTN_INNER;       // 1176
+    const PAL_COLS = 4;
+    const PAL_GAP = 16;
+    const W_SWATCH = Math.floor((W_PAL_INNER - PAL_GAP * (PAL_COLS - 1)) / PAL_COLS);
+
+    function rgbToHex(c) {
+      function h(x) {
+        const v = Math.round(x * 255).toString(16).toUpperCase();
+        return v.length === 1 ? "0" + v : v;
+      }
+      return "#" + h(c.r) + h(c.g) + h(c.b);
+    }
+
+    function paletteSwatch(tokenName, color, usedBy) {
+      const card = vSec(W_SWATCH);
+      card.itemSpacing = 8;
+      const chip = figma.createFrame();
+      chip.resize(W_SWATCH, 32);
+      chip.cornerRadius = 6;
+      setFill(chip, color, 1);
+      setStroke(chip, Ct.border, 0.6, 0.5);
+      card.appendChild(chip);
+      const meta = vSec(W_SWATCH);
+      meta.itemSpacing = 3;
+      const head = hSec(W_SWATCH);
+      head.itemSpacing = 8;
+      head.counterAxisAlignItems = "CENTER";
+      head.appendChild(txt(tokenName, F.s, 10, Ct.borderBright, undefined, 0.4));
+      const spacerPush = figma.createFrame();
+      spacerPush.resize(1, 1);
+      spacerPush.fills = [];
+      spacerPush.layoutGrow = 1;
+      head.appendChild(spacerPush);
+      head.appendChild(txt(rgbToHex(color), F.r, 10, Ct.textDim));
+      meta.appendChild(head);
+      meta.appendChild(txtW(usedBy, F.r, 10, Ct.strokeMid, W_SWATCH, 14));
+      card.appendChild(meta);
+      return card;
+    }
+
+    // 10 tokens — two workhorses (strokeMid, borderBright) carry the entire
+    // dark/bright binary; six structural variants (backings, Locked check
+    // absorbed into strokeMid, accent ladder, danger); one pure utility
+    // (white). Reading order = usage frequency, not brightness.
+    const paletteTokens = [
+      { name: "strokeMid",    color: Ct.strokeMid,    usedBy: "Disabled / Locked stroke · DISABLED button icon · Locked ON ✓ · N/A em-dash" },
+      { name: "borderBright", color: Ct.borderBright, usedBy: "Normal-OFF stroke · primary text · REST / HOVER / PRESSED icon" },
+      { name: "textDim",      color: Ct.textDim,      usedBy: "Column headers, design-note body, secondary text" },
+      { name: "white",        color: Ct.white,        usedBy: "Overridden / Inherited ON ✓ · HOVER / PRESSED bg tint (8 / 12 %)" },
+      { name: "backMid",      color: Ct.backMid,      usedBy: "Locked backing — checkbox crown, eye body" },
+      { name: "backDim",      color: Ct.backDim,      usedBy: "Disabled + Locked eye body, deepest fills" },
+      { name: "accent",       color: Ct.accent,       usedBy: "Overridden ON — box fill, eye outline" },
+      { name: "accentFill",   color: Ct.accentFill,   usedBy: "Inherited ON fill" },
+      { name: "accentEdge",   color: Ct.accentEdge,   usedBy: "Inherited ON stroke" },
+      { name: "danger",       color: Ct.danger,       usedBy: "Safety Cover armed-window border" },
+    ];
+
+    const palCard = figma.createFrame();
+    palCard.resize(W_PAL_TABLE, 10);
+    palCard.layoutMode = "VERTICAL";
+    palCard.layoutSizingHorizontal = "FIXED";
+    palCard.layoutSizingVertical = "HUG";
+    palCard.paddingTop = 24; palCard.paddingBottom = 24;
+    palCard.paddingLeft = 24; palCard.paddingRight = 24;
+    palCard.itemSpacing = 0;
+    palCard.cornerRadius = 12;
+    setFill(palCard, Ct.panel, 1);
+    setStroke(palCard, Ct.border, 1, 1);
+
+    palCard.appendChild(txt("Palette — single source of truth", F.b, 16, Ct.borderBright));
+    palCard.appendChild(spacer(10, 4));
+    palCard.appendChild(txtW(
+      "Ten tokens — a deterministic SOT referenced by every checkbox, eye, button, row, and label in the rest of this doc. Apple rule: pick the colour once, inherit it everywhere. Two workhorses (strokeMid and borderBright) carry the entire dark / bright binary — together they render every stroke, every icon, every primary text surface that isn't an accent or a backing. Everything else is either a structural variant (backings, accent ladder) or a narrow utility (danger, white). When a mockup prompts «why is this grey different from that grey», it almost always means a fresh hex got introduced instead of reusing an existing token — this card is here to make that mistake impossible to miss.",
+      F.r, 11, Ct.textDim, W_PAL_INNER, 16
+    ));
+    palCard.appendChild(spacer(10, 16));
+
+    for (var pi = 0; pi < paletteTokens.length; pi += PAL_COLS) {
+      const row = hSec(W_PAL_INNER);
+      row.itemSpacing = PAL_GAP;
+      row.counterAxisAlignItems = "MIN";
+      for (var pj = 0; pj < PAL_COLS && pi + pj < paletteTokens.length; pj++) {
+        const t = paletteTokens[pi + pj];
+        row.appendChild(paletteSwatch(t.name, t.color, t.usedBy));
+      }
+      palCard.appendChild(row);
+      if (pi + PAL_COLS < paletteTokens.length) palCard.appendChild(spacer(10, 16));
+    }
+
+    palCard.appendChild(spacer(10, 16));
+    palCard.appendChild(divider(W_PAL_INNER, Ct.border, 0.8));
+    palCard.appendChild(spacer(10, 12));
+    const palNote = vSec(W_PAL_INNER);
+    palNote.appendChild(txt("Design note", F.s, 10, Ct.textDim));
+    palNote.appendChild(spacer(10, 6));
+    palNote.appendChild(txtW(
+      "Reading order matches frequency of reference, not brightness. The first two tokens (strokeMid, borderBright) carry almost the whole load — every disabled/locked/N-A surface collapses into strokeMid, every normal-off/bright-foreground/button-hover surface into borderBright. textDim handles secondary typography alone (headers, notes). white is a pure utility — the Overridden / Inherited ✓ glyphs and the HOVER / PRESSED bg tint (white @8/12%) both come out of it. backMid / backDim stage the Locked-tier backings. accent / accentFill / accentEdge stage the Overridden → Inherited ladder. «danger» is the only outlier — live only inside the Safety Cover armed window. Anything beyond these ten is a palette violation and should be flagged in review. Three tokens got absorbed on 2026-04-21 (textLite → borderBright, textGhost → strokeMid, lockedCheck → strokeMid) once their ~3–14% deltas were shown to carry no signal the user could act on.",
+      F.r, 11, Ct.textDim, W_PAL_INNER, 16
+    ));
+    palCard.appendChild(palNote);
+
+    // Stack: palette card on top, chk+eye row below, buttons table bottom —
+    // keeps the palette SOT visible before every table that inherits from it.
+    const topRow = hSec(contentW);
+    topRow.itemSpacing = 24;
+    topRow.counterAxisAlignItems = "MIN";
+    topRow.appendChild(chkTable);
+    topRow.appendChild(eyeTable);
+
+    const stack = vSec(contentW);
+    stack.itemSpacing = 24;
+    stack.appendChild(palCard);
+    stack.appendChild(topRow);
+    stack.appendChild(btnCard);
+    return stack;
+  })();
+
+  sTax.appendChild(taxBlock);
+  root.appendChild(sTax);
 
   // ==================================================
   // SECTION 2 — Progress panel variants
@@ -1394,6 +2228,19 @@ async function main() {
   // Checkbox with countdown DRAINING along its own rounded-rect border (CCW).
   // Base border is gray; blue overlay covers the remaining portion.
   // progress01 = 1 → full blue border; progress01 = 0 → all gray (= about to re-lock).
+  //
+  // Visual model = TRIMMED STROKE PATH retreating CCW. One continuous segment
+  // whose end point walks counter-clockwise, shortening over time. NOT a
+  // dashed pattern — dashPattern reads as a uniform dotted frame and misses
+  // the "time is draining" affordance.
+  //
+  // NB: Sampled polyline + horizontal-flip transform is a FIGMA-SPECIFIC
+  // WORKAROUND. Figma's VectorNode has no native trim-path / stroke-dashoffset,
+  // so we approximate by truncating the point list and flipping axes. In
+  // production (CEP + React/CSS) this collapses to one declarative property:
+  // an <svg><path> with stroke-dasharray = perimeter length, stroke-dashoffset
+  // animated 0 → perimeter. No sampling, no flip, no relativeTransform — keep
+  // this hack inside the Figma mockup only.
   function borderCountdown(size, r, progress01) {
     const wrap = figma.createFrame();
     wrap.resize(size, size);
@@ -1947,8 +2794,8 @@ async function main() {
   const s46 = vSec(contentW);
   s46.itemSpacing = 16;
   s46.appendChild(sectionTitle(
-    "4.6 SUB=OFF subtree lockout (resolved 2026-04-19)",
-    "Full override. No subs watched → no bins created → nothing flows to Premiere from descendants. All child controls cascade to inherited-off; NAME/PATH dim to textFade. Parent keeps SUB active as SOT.",
+    "4.6 SUB=OFF subtree dormancy (revised 2026-04-21)",
+    "Full override. No subs watched → no bins created → nothing flows to Premiere from descendants. All child SUB/REL/SEQ/FLT cascade to Disabled tier (dashed empty, stored value preserved). EYE keeps parent's Inherited value so it renders Disabled+Inherited ON — dormant today, will snap to parent's autowatch when SUB returns. NAME/PATH dim to strokeMid. Parent keeps SUB active as SOT.",
     contentW
   ));
 
@@ -1974,21 +2821,19 @@ async function main() {
   }));
   s46Panel.appendChild(divider(PANEL_W, C.border, 0.25));
   s46Panel.appendChild(row({
-    indent: 18, state: "ok", tree: "expanded",
+    indent: 18, state: "disabled", tree: "expanded",
     name: "2025_Q4", path: "…/Archive/2025_Q4",
-    sub: "inherited-off", rel: "on", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
+    sub: "disabled-off", rel: "disabled-on", seq: "disabled-off", flt: "disabled-off", eye: "disabled-inherited-on",
     label: null, labelInherited: true,
-    subLocked: true,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
+    actions: [{ glyph: "↻", color: C.strokeMid }, { glyph: "⌕", color: C.strokeMid }, { glyph: "🧲", color: C.strokeMid }],
   }));
   s46Panel.appendChild(divider(PANEL_W, C.border, 0.25));
   s46Panel.appendChild(row({
-    indent: 36, state: "ok", tree: "leaf",
+    indent: 36, state: "disabled", tree: "leaf",
     name: "shoot_01", path: "…/2025_Q4/shoot_01",
-    sub: "inherited-off", rel: "inherited-on", seq: "inherited-off", flt: "off", eye: "inherited-on",
+    sub: "disabled-off", rel: "disabled-inherited-on", seq: "disabled-off", flt: "disabled-off", eye: "disabled-inherited-on",
     label: null, labelInherited: true,
-    subLocked: true,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
+    actions: [{ glyph: "↻", color: C.strokeMid }, { glyph: "⌕", color: C.strokeMid }, { glyph: "🧲", color: C.strokeMid }],
   }));
   s46Row.appendChild(s46Panel);
 
@@ -2013,10 +2858,11 @@ async function main() {
   s46RuleHead.appendChild(txt("Cascade rule", F.s, 12, C.white, undefined, 0.5));
   s46Rule.appendChild(s46RuleHead);
   s46Rule.appendChild(txtW(
-    "SUB=OFF on row X ⇒ every descendant keeps its stored SUB/REL/SEQ/FLT value, but each checkbox renders with accent swapped to textDim. " +
-    "Shape preserved (user still sees ON vs OFF vs inherited), color neutralized (control is inactive). " +
-    "NAME + PATH dim to textFade, actions drop to 35% opacity. Click on any locked control → tooltip \"Enable SUB on <X> first\". " +
-    "Flipping X's SUB back on restores accent instantly — nothing to re-enter.",
+    "SUB=OFF on row X ⇒ every descendant keeps its stored SUB/REL/SEQ/FLT value, but each checkbox renders as Disabled — dashed empty box with strokeMid stroke (ON variant adds strokeMid ✓). " +
+    "Shape preserved (user still sees ON vs OFF), tier neutralized (control is dormant, not locked). " +
+    "EYE follows the same Inherited cascade: parent eye=ON is a soft inherit, so the child eye renders Disabled+Inherited ON (strokeMid dashed stroke, no подложка) — composed signal: both dormant (SUB cascade) and inherited (parent's eye value) — will snap to live Inherited when SUB returns. " +
+    "NAME + PATH dim to strokeMid, actions drop to 35% opacity. Click on any dormant control → tooltip \"Enable SUB on <X> first\". " +
+    "Flipping X's SUB back on restores live tiers instantly — nothing to re-enter.",
     F.r, 12, C.text, contentW - PANEL_W - 72, 18
   ));
   s46Notes.appendChild(s46Rule);
@@ -2038,8 +2884,10 @@ async function main() {
   s46WhyHead.appendChild(txt("Decision log — 2026-04-19", F.s, 12, C.white, undefined, 0.5));
   s46Why.appendChild(s46WhyHead);
   s46Why.appendChild(txtW(
-    "Why shown-but-disabled (not hidden): user keeps visibility of what would come online if SUB flips back on. " +
-    "Hidden subtree would make re-enabling a leap of faith. Why no separate lock icon: the four greyed checkboxes + dimmed NAME/PATH already carry the signal — adding 🔒 would be visual spam. " +
+    "Why shown-but-dormant (not hidden): user keeps visibility of what would come online if SUB flips back on. " +
+    "Hidden subtree would make re-enabling a leap of faith. Why Disabled (not Locked): this is dormancy, not coercion — the engine isn't running here, and the stored values are user intent preserved for later. Locked visual would read as \"parent is forcing this value\", which is false; nothing cascades while SUB=off. " +
+    "Why EYE renders Disabled+Inherited: the eye's Inherited cascade is orthogonal to SUB dormancy and survives it. Parent's eye=ON becomes Inherited ON on descendants, which composes with Disabled row-off into Disabled+Inherited. The ✓ signal \"when SUB returns, the eye will be ON\" — the composed tier is honest: both dormant AND inherited. " +
+    "Why no separate lock icon: dashed boxes + dimmed NAME/PATH already carry the signal (no backing needed — this is Inherited, not Locked) — adding 🔒 would be visual spam. " +
     "Why parent stays active: SUB is the SOT, user rules the toggle here; only descendants freeze.",
     F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
   ));
@@ -2114,15 +2962,19 @@ async function main() {
   }));
   s47Panel.appendChild(divider(PANEL_W, C.border, 0.25));
 
-  // Row D — DEL=on but subLocked (locked wins over danger → textDim, not red)
+  // Row D — DEL=on inside SUB=OFF dormant subtree (disabled wins over danger → backDim, not red).
+  // Eye rendered as plain `disabled-on` (not `disabled-locked-on`): the lock source (parent
+  // Archive with eye=ON) is NOT rendered in this demo — only reelC is shown as a leaf.
+  // Rule: the Disabled+Locked composite is legible only when the locking ancestor is visible
+  // in the current view. Without that visible source, the lock layer confuses more than it
+  // informs, so we fall back to plain Disabled. See §4.6 for the full Disabled+Locked case.
   s47Panel.appendChild(row({
-    indent: 0, state: "ok", tree: "leaf",
+    indent: 0, state: "disabled", tree: "leaf",
     name: "reelC", path: "…/Archive/reelC",
-    sub: "inherited-off", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
-    showDel: true, del: "on",
-    subLocked: true,
+    sub: "disabled-off", rel: "disabled-off", seq: "disabled-off", flt: "disabled-off", eye: "disabled-on",
+    showDel: true, del: "disabled-on",
     label: null, labelInherited: true,
-    actions: [{ glyph: "↻", color: C.text }, { glyph: "⌕", color: C.text }, { glyph: "🧲", color: C.text }],
+    actions: [{ glyph: "↻", color: C.strokeMid }, { glyph: "⌕", color: C.strokeMid }, { glyph: "🧲", color: C.strokeMid }],
   }));
 
   s47Row.appendChild(s47Panel);
@@ -2158,7 +3010,7 @@ async function main() {
     "Bidirectional sync: bin delete → source files moved to OS trash. Source folder deleted in OS → bin purged in Premiere.",
     "Premiere guard: a bin with clips in active use will not purge — SheepDog reports \"Skipped, N clips in use\" and highlights the offending rows amber.",
     "Soft delete only — files go to OS trash (Windows 48 h recovery window); never a hard unlink.",
-    "SUB=OFF lockout applies. Locked DEL shows the stored value in textDim (same rule as SUB/REL/SEQ/FLT).",
+    "SUB=OFF dormancy applies. Dormant DEL shows the stored value in Disabled tier (dashed, backDim) — same rule as SUB/REL/SEQ/FLT.",
     "Undo toast — 10 s window to reverse the last commit before the trash entry becomes the only recovery path.",
   ];
   for (const line of s47RulesBullets) {
@@ -2191,7 +3043,7 @@ async function main() {
   s47Why.appendChild(txtW(
     "Two-gate destroy: the user passes Settings → Danger zone (read the warning, flip the toggle) AND then per-row safety cover. Column only appears after gate 1 — the mere presence of the header is a meaningful signal on its own, no red backdrop needed. " +
     "Red reserved for activation signals only: filled on-state + cover-armed countdown. Column header, off, inherited-off, disabled and cover-down render identically to other columns — a red everywhere scheme would desensitize, and the danger should read as \"something is about to happen / is currently armed\", not \"this column exists\". " +
-    "Settings → Danger zone preview keeps a red border because it sits OUTSIDE the column and IS the warning gate itself. Locked wins over danger: SUB=OFF cascade still tints the stored DEL value in textDim (user call, 2026-04-20). " +
+    "Settings → Danger zone preview keeps a red border because it sits OUTSIDE the column and IS the warning gate itself. Disabled wins over danger: SUB=OFF cascade renders the stored DEL value as Disabled tier (dashed, backDim) — dormant subtree mutes red (user call, revised 2026-04-21). " +
     "Trash-first (not hard delete) keeps data integrity (P0); Premiere's own \"clip in use\" guard gives a second natural belt.",
     F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
   ));
@@ -2644,7 +3496,7 @@ async function main() {
       box.fills = [];
       if (dormant) {
         // Inheritance color-swap off: matches checkbox("off", locked=true)
-        setStrokeFlat(box, C.textFade, 0.65, 1);
+        setStrokeFlat(box, C.strokeMid, 0.65, 1);
       } else {
         setStroke(box, C.borderStrong, 1, 1);
       }
@@ -2683,7 +3535,7 @@ async function main() {
     setFill(f, C.panelHi, 1);
     setStroke(f, C.border, 1, 1);
     f.appendChild(txt(label, F.m, 10, C.text));
-    f.appendChild(txt("×", F.r, 10, C.textFade));
+    f.appendChild(txt("×", F.r, 10, C.strokeMid));
     return f;
   }
   function addChip(label) {
@@ -3111,126 +3963,9 @@ async function main() {
   s7Override.appendChild(s7OverDemo);
   s7Notes.appendChild(s7Override);
 
-  // Icon button states — Adobe parity demo card
-  const s7IconStates = vSec(contentW - PANEL_W - 32);
-  s7IconStates.cornerRadius = 8;
-  setFill(s7IconStates, C.panel, 1);
-  setStroke(s7IconStates, C.border, 1, 1);
-  s7IconStates.paddingTop = 16; s7IconStates.paddingBottom = 16;
-  s7IconStates.paddingLeft = 20; s7IconStates.paddingRight = 20;
-  s7IconStates.itemSpacing = 10;
-
-  // Card header
-  const s7ISHead = hHug();
-  s7ISHead.itemSpacing = 10;
-  s7ISHead.counterAxisAlignItems = "CENTER";
-  const s7ISDot = figma.createFrame();
-  s7ISDot.resize(6, 6); s7ISDot.cornerRadius = 3;
-  setFill(s7ISDot, C.accent, 1);
-  s7ISHead.appendChild(s7ISDot);
-  s7ISHead.appendChild(txt("Icon button states — Adobe parity", F.s, 12, C.white, undefined, 0.5));
-  s7IconStates.appendChild(s7ISHead);
-
-  // Body text
-  s7IconStates.appendChild(txtW(
-    "Icon buttons match Premiere Pro / Adobe Spectrum DS behavior. Rest is bright and calm, hover lifts with a white@8% bg (not darken), pressed briefly deepens to white@12%, toggle-ON = accent icon inside an accent@22% pill with a thin accent stroke. The pill is the signal — color alone isn't enough, icons all look 'slightly different' otherwise. Same principle as our inheritance: color-swap + bg change, never opacity.",
-    F.r, 11, C.textDim, contentW - PANEL_W - 72, 16
-  ));
-
-  // State grid — header row
-  const s7ISGridW = contentW - PANEL_W - 72;
-  const s7ISGrid = vSec(s7ISGridW);
-  s7ISGrid.itemSpacing = 6;
-
-  // Column header row
-  const s7ISColHdr = hSec(s7ISGridW);
-  s7ISColHdr.itemSpacing = 16;
-  s7ISColHdr.counterAxisAlignItems = "CENTER";
-  // 40px spacer for the label column
-  s7ISColHdr.appendChild(spacer(40, 1));
-  const stateLabels = ["rest", "hover", "pressed", "active"];
-  for (var si = 0; si < stateLabels.length; si++) {
-    const lbl = figma.createFrame();
-    lbl.resize(44, 10);
-    lbl.fills = [];
-    lbl.layoutMode = "HORIZONTAL";
-    lbl.layoutSizingHorizontal = "FIXED";
-    lbl.layoutSizingVertical = "HUG";
-    lbl.primaryAxisAlignItems = "CENTER";
-    lbl.counterAxisAlignItems = "CENTER";
-    lbl.appendChild(txt(stateLabels[si].toUpperCase(), F.s, 10, C.textDim, undefined, 0.5));
-    s7ISColHdr.appendChild(lbl);
-  }
-  s7ISGrid.appendChild(s7ISColHdr);
-
-  // Helper: build one state cell (22×22 frame)
-  function stateCell(svgKey, iconColor, bgColor, bgOpacity, strokeColor, strokeOpacity) {
-    const f = figma.createFrame();
-    f.resize(22, 22);
-    f.cornerRadius = 3;
-    f.layoutMode = "HORIZONTAL";
-    f.layoutSizingHorizontal = "FIXED";
-    f.layoutSizingVertical = "FIXED";
-    f.primaryAxisAlignItems = "CENTER";
-    f.counterAxisAlignItems = "CENTER";
-    if (bgColor) {
-      setFill(f, bgColor, bgOpacity != null ? bgOpacity : 1);
-    } else {
-      f.fills = [];
-    }
-    if (strokeColor) {
-      setStroke(f, strokeColor, strokeOpacity != null ? strokeOpacity : 1, 1);
-    }
-    f.appendChild(loadIcon(svgKey, iconColor, 14));
-    return f;
-  }
-
-  // Icon rows: ↻ ⌕ 🧲 👁
-  const s7ISIcons = [
-    { key: "refresh", label: "↻" },
-    { key: "search",  label: "⌕" },
-    { key: "magnet",  label: "🧲" },
-    { key: "eye",     label: "👁" },
-  ];
-  for (var ii = 0; ii < s7ISIcons.length; ii++) {
-    const iconKey = s7ISIcons[ii].key;
-    const iconLabel = s7ISIcons[ii].label;
-    const row = hSec(s7ISGridW);
-    row.itemSpacing = 16;
-    row.counterAxisAlignItems = "CENTER";
-
-    // Label cell — 40px, show icon dimly as reference
-    const labelCell = figma.createFrame();
-    labelCell.resize(40, 22);
-    labelCell.fills = [];
-    labelCell.layoutMode = "HORIZONTAL";
-    labelCell.layoutSizingHorizontal = "FIXED";
-    labelCell.layoutSizingVertical = "FIXED";
-    labelCell.primaryAxisAlignItems = "CENTER";
-    labelCell.counterAxisAlignItems = "CENTER";
-    labelCell.appendChild(loadIcon(iconKey, C.textDim, 14));
-    row.appendChild(labelCell);
-
-    // rest: transparent, icon = C.text
-    row.appendChild(stateCell(iconKey, C.text, null, null, null, null));
-    // hover: white@0.08 bg, icon = C.text
-    row.appendChild(stateCell(iconKey, C.text, C.white, 0.08, null, null));
-    // pressed: white@0.12 bg, icon = C.text
-    row.appendChild(stateCell(iconKey, C.text, C.white, 0.12, null, null));
-    // active: accent@0.22 bg + accent stroke, icon = C.accent
-    row.appendChild(stateCell(iconKey, C.accent, C.accent, 0.22, C.accent, 0.5));
-
-    s7ISGrid.appendChild(row);
-  }
-  s7IconStates.appendChild(s7ISGrid);
-
-  // Caption below grid
-  s7IconStates.appendChild(txtW(
-    "No opacity animation for state changes — Premiere is snappy, transitions ~100ms or less. Disabled state (not shown) = icon=C.textFade, no hover interaction.",
-    F.r, 10, C.textDim, contentW - PANEL_W - 72, 14
-  ));
-
-  s7Notes.appendChild(s7IconStates);
+  // Icon button states table lives in §1.5 now (palette inheritance — the
+  // button DISABLED / REST icon colours are the same hex as the checkbox
+  // Disabled / Normal-OFF strokes, so the three taxonomy cards belong together).
 
   // Decision log
   const s7Why = vSec(contentW - PANEL_W - 32);

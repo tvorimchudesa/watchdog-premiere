@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  	<meta charset="utf-8">
+  	<meta name="viewport" content="initial-scale=1, width=device-width">
+  	
+  	<link rel="stylesheet"  href="./index.css" />
+  	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  	
+  	
+  	
+</head>
+<body>
+  	
+  	<div class="frame">
+    		<div class="frame2">
+      			<b class="checkbox-state-taxonomy">Checkbox state taxonomy + Safety Cover</b>
+      			<div class="frame3">
+      			</div>
+      			<div class="base-classes-normal">Base classes: Normal → Inherited → Locked → Disabled. Compound rows (Disabled+Inherited, Disabled+Locked) show how Disabled composes orthogonally with the cascade class. SUB cascade is SYMMETRIC — SUB=OFF on an ancestor locks both ON and OFF values in descendants. Only Normal ON and Inherited ON carry accent — every OFF and every grey-tier cell is pure neutral.</div>
+      			<div class="frame4">
+      			</div>
+      			<div class="frame5">
+        				<div class="frame6">
+          					<div class="on">ON</div>
+        				</div>
+        				<div class="frame6">
+          					<div class="on">OFF</div>
+        				</div>
+        				<div class="frame8">
+          					<div class="on">CLASS</div>
+        				</div>
+        				<div class="frame9">
+          					<div class="on">MEANING</div>
+        				</div>
+      			</div>
+      			<div class="rectangle">
+      			</div>
+      			<div class="frame10">
+        				<div class="frame11">
+          					<div class="frame12">
+            						<b class="b">✓</b>
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame14">
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Normal</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">User explicitly set this cell. Full-saturation accent on ON; neutral bright stroke on OFF. Wins over ancestor — any cascade from above stops here.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame17">
+        				<div class="frame11">
+          					<div class="frame19">
+            						<div class="div">✓</div>
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame21">
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Inherited</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Value flows from nearest ancestor override. Dim accent on ON, neutral dim stroke on OFF. Clickable — click promotes this cell to Normal (pins the value here, breaks further inheritance).</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame24">
+        				<div class="frame11">
+          					<div class="frame26">
+            						<div class="div">✓</div>
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame28">
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Locked</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Value forced by cascade-lock source (SUB=OFF on an ancestor). Neutral grey — no accent tint. OFF has a subtle backing («крышечка»), distinguishing Locked OFF from Inherited OFF (empty) and Disabled OFF (dashed). Not clickable — unlock only at the source.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame31">
+        				<div class="frame11">
+          					<div class="frame33">
+            						<div class="div">✓</div>
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame35">
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Disabled (row off)</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Row is functionally off — media missing or scan running. Dashed border + no backing in both states. Clicks are still accepted and mutate stored state — the change just has no real-world effect until the row re-enables. Safety Cover applies here specifically to remind the user they're touching something while the row is dead.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame38">
+        				<div class="frame11">
+          					<div class="frame40">
+            						<div class="div">✓</div>
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame42">
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Disabled + Inherited (row off)</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Row is off, and the stored value itself is Inherited from an ancestor. Dashed border (row-off signal) with a dim-accent check glyph on ON (lineage hint). Clicks are still accepted and mutate the cell's local override — when the row re-enables, that local override takes effect (promoting to Normal) if set.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame38">
+        				<div class="frame11">
+          					<div class="frame47">
+            						<div class="div">✓</div>
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame49">
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Disabled + Locked (row off)</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Row is off, and the stored value is cascade-locked from above. Dashed border with the grey Locked «подложка» peeking through. Not clickable even while the row is off — the Locked layer wins over the Disabled click-acceptance. No Safety Cover (nothing to gate).</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame52">
+        				<div class="frame11">
+          					<div class="div">N/A</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame55">
+            						<img class="frame-icon" alt="">
+            						
+            						<img class="frame-icon" alt="">
+            						
+            						<img class="frame-icon" alt="">
+            						
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Safety Cover Countdown</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Orthogonal overlay — not a state class. Applies wherever the cell accepts clicks: Normal, Inherited, Disabled, Disabled+Inherited (4 of 6 rows above). Excluded from Locked and Disabled+Locked — source owns the value, so a 2-click gate has nothing to protect. Mechanic: first click arms (stroke turns red), countdown drains over ~3s, second click within the window commits. Timeout re-locks. Red appears ONLY during the armed countdown.</div>
+        				</div>
+      			</div>
+      			<div class="frame4">
+      			</div>
+      			<div class="rectangle8">
+      			</div>
+      			<div class="frame59">
+      			</div>
+      			<div class="frame60">
+        				<div class="on">Design note</div>
+        				<div class="frame61">
+        				</div>
+        				<div class="base-classes-normal">Works at 14px because distinguishing signals are structural (fill presence, dash pattern, backing), not glyph-based. Safety Cover is red-only during the armed window — activation signal, not column chrome. This keeps red desensitization-free: the user sees red only when something is about to happen.</div>
+      			</div>
+    		</div>
+    		<div class="frame62">
+      			<b class="checkbox-state-taxonomy">Eye state taxonomy + Safety Cover</b>
+      			<div class="frame3">
+      			</div>
+      			<div class="same-base-classes">Same base classes as the checkbox table (Normal / Inherited / Locked / Disabled + compounds), but ASYMMETRIC cascade: open eye = hard lock on descendants (no Inherited ON), closed eye = soft inherit (no Locked OFF). Forbidden (class, value) pairs render as a faded em-dash. Class signal has moved from the glyph itself to a 20×20 wrapper — transparent for Normal/Inherited (bare eye), painted for Locked/Disabled. Only Normal ON carries accent.</div>
+      			<div class="frame4">
+      			</div>
+      			<div class="frame65">
+        				<div class="frame6">
+          					<div class="on">ON</div>
+        				</div>
+        				<div class="frame6">
+          					<div class="on">OFF</div>
+        				</div>
+        				<div class="frame8">
+          					<div class="on">CLASS</div>
+        				</div>
+        				<div class="frame9">
+          					<div class="on">MEANING</div>
+        				</div>
+      			</div>
+      			<div class="rectangle">
+      			</div>
+      			<div class="frame70">
+        				<div class="frame11">
+          					<div class="frame72">
+            						<img class="frame-icon4" alt="">
+            						
+          					</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame72">
+            						<img class="frame-icon4" alt="">
+            						
+          					</div>
+        				</div>
+        				<div class="frame75">
+          					<div class="on">Normal</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">User explicitly set eye state. Bare glyph — no container chrome. Full-saturation accent eye-open on ON; calm neutral borderStrong eye-closed on OFF. Wins over ancestor cascade.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame77">
+        				<div class="frame11">
+          					<div class="b">—</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame72">
+            						<img class="frame-icon4" alt="">
+            						
+          					</div>
+        				</div>
+        				<div class="frame81">
+          					<div class="on">Inherited</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Closed ancestor cascades as SOFT INHERIT — descendants echo closed, may individually override to open. Bare glyph, dim textDim eye-closed. Clickable — click promotes to Normal (the cell pins its own value). No ON variant: an open ancestor cascades as Locked ON, not Inherited ON.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame77">
+        				<div class="frame11">
+          					<img class="frame-icon4" alt="">
+          					
+        				</div>
+        				<div class="frame11">
+          					<div class="b">—</div>
+        				</div>
+        				<div class="frame81">
+          					<div class="on">Locked</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Open ancestor cascades as HARD LOCK — descendants are forced open. Glyph lives in a 20×20 wrapper with grey «подложка» fill. Not clickable — unlock only at the ancestor (toggle that eye closed). No OFF variant: a closed ancestor doesn't lock, so a closed eye is always Inherited or Normal, never Locked.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame70">
+        				<div class="frame11">
+          					<img class="frame-icon4" alt="">
+          					
+        				</div>
+        				<div class="frame11">
+          					<img class="frame-icon4" alt="">
+          					
+        				</div>
+        				<div class="frame75">
+          					<div class="on">Disabled (row off)</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Row is functionally off — media missing or scan running. Dashed 20×20 wrapper, no fill, in both ON and OFF. Clicks are still accepted and mutate stored state — the change just has no real-world effect until the row re-enables. Safety Cover applies here specifically to remind the user they're touching something while the row is dead.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame77">
+        				<div class="frame11">
+          					<div class="b">—</div>
+        				</div>
+        				<div class="frame11">
+          					<img class="frame-icon4" alt="">
+          					
+        				</div>
+        				<div class="frame81">
+          					<div class="on">Disabled + Inherited (row off)</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Row is off, and the stored value itself is Inherited OFF from an ancestor. Dashed wrapper over the bare eye-closed glyph. Clicks are still accepted — they set a local override that will take effect when the row re-enables. ON variant doesn't exist for the same reason as plain Inherited ON.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame77">
+        				<div class="frame11">
+          					<img class="frame-icon4" alt="">
+          					
+        				</div>
+        				<div class="frame11">
+          					<div class="b">—</div>
+        				</div>
+        				<div class="frame81">
+          					<div class="on">Disabled + Locked (row off)</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Row is off, but the eye is also under cascade-lock from an open ancestor. Dashed wrapper with the grey Locked «подложка» peeking through. Not clickable even while the row is off — Locked wins over Disabled click-acceptance. No Safety Cover (nothing to gate). OFF variant doesn't exist for the same reason as plain Locked OFF.</div>
+        				</div>
+      			</div>
+      			<div class="rectangle2">
+      			</div>
+      			<div class="frame52">
+        				<div class="frame11">
+          					<div class="div">N/A</div>
+        				</div>
+        				<div class="frame11">
+          					<div class="frame55">
+            						<img class="frame-icon" alt="">
+            						
+            						<img class="frame-icon" alt="">
+            						
+            						<img class="frame-icon" alt="">
+            						
+          					</div>
+        				</div>
+        				<div class="frame15">
+          					<div class="on">Safety Cover Countdown</div>
+        				</div>
+        				<div class="frame16">
+          					<div class="user-explicitly-set">Same overlay mechanic as the checkbox table — applies wherever the cell accepts clicks: Normal (both), Inherited OFF, Disabled (both), Disabled+Inherited OFF. Excluded from Locked ON and Disabled+Locked ON (source owns the value). The cover wraps the 20×20 bounding target regardless of whether the wrapper chrome is painted or the glyph is bare. First click arms, drains over ~3s, second click commits; timeout re-locks. Red only during the armed countdown.</div>
+        				</div>
+      			</div>
+      			<div class="frame4">
+      			</div>
+      			<div class="rectangle8">
+      			</div>
+      			<div class="frame59">
+      			</div>
+      			<div class="frame111">
+        				<div class="on">Design note</div>
+        				<div class="frame61">
+        				</div>
+        				<div class="base-classes-normal">The asymmetry captures a real semantic rule: you can't hide a child of a visible parent (open cascades as lock), but you can individually show a child of a hidden parent (closed cascades as hint). The wrapper-vs-bare visual split keeps Normal and Inherited feeling «alive» while Locked and Disabled read as «contained». Same red-during-armed-window rule applies.</div>
+      			</div>
+    		</div>
+  	</div>
+  	
+  	
+  	
+  	
+</body>
+</html>
