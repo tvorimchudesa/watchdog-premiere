@@ -368,6 +368,24 @@ async function main() {
     }
   }
 
+  // applyBodyGradient — fills eyeClosed arc with top→bottom vertical gradient.
+  // Used for Locked-OFF + Disabled+Locked-OFF eye variants (race-prevention
+  // during Busy). Gradient: top 0% alpha → bottom 100% alpha (same color).
+  // Gives the closed eyelid a "weighty pressed-down" look.
+  function applyBodyGradient(node, glyph, colorRGB) {
+    if (!("children" in node) || !Array.isArray(node.children)) return;
+    const body = node.children[bodyChildIndex(glyph)];
+    if (!body || !("fills" in body)) return;
+    body.fills = [{
+      type: "GRADIENT_LINEAR",
+      gradientTransform: [[0, 1, 0], [-1, 0, 1]],
+      gradientStops: [
+        { position: 0, color: { r: colorRGB.r, g: colorRGB.g, b: colorRGB.b, a: 0 } },
+        { position: 1, color: { r: colorRGB.r, g: colorRGB.g, b: colorRGB.b, a: 1 } },
+      ],
+    }];
+  }
+
   // checkbox(variant, locked?, danger?)
   //
   // 4-tier "presence" gradient (see §1 legend and §1.5 taxonomy tables).
@@ -536,13 +554,13 @@ async function main() {
     } else if (variant === "disabled-on") {
       cls = "disabled"; value = "on";
     } else if (variant === "inherited-on") {
-      // Cascade is now symmetric — inherited-on renders as Inherited, not Locked.
       cls = "inherited"; value = "on";
     } else if (locked) {
-      const isOn = (variant === "on" || variant === "inherited-on");
-      // locked=true flag cascades as Inherited (symmetric cascade, not hard-lock).
-      if (isOn) { cls = "inherited"; value = "on"; }
-      else      { cls = "inherited"; value = "off"; }
+      // locked=true flag renders as LOCKED tier (hard-lock visual).
+      // Use-cases: Busy race-prevention, future admin-locked cells.
+      // SUB-cascade dormancy uses explicit disabled-inherited-* variants instead.
+      cls = "locked";
+      value = (variant === "on" || variant === "inherited-on") ? "on" : "off";
     } else if (variant === "inherited-off") {
       cls = "inherited"; value = "off";
     } else {
@@ -557,7 +575,7 @@ async function main() {
     wrap.fills = [];
 
     const glyphSize = 14;
-    let glyph, color, backing = null, dashed = false;
+    let glyph, color, backing = null, dashed = false, arcGradient = null;
     if (cls === "overridden" && value === "on") {
       glyph = "eye"; color = C.accent;
     } else if (cls === "overridden" && value === "off") {
@@ -570,25 +588,34 @@ async function main() {
     } else if (cls === "locked" && value === "on") {
       // Reserved tier — backMid подложка distinguishes from Inherited ON.
       glyph = "eye"; color = TC.strokeMid; backing = TC.backMid;
+    } else if (cls === "locked" && value === "off") {
+      // NEW: Locked OFF — inherited-off base + backMid gradient on arc.
+      // Race-prevention visual during Busy.
+      glyph = "eyeClosed"; color = TC.strokeMid; arcGradient = TC.backMid;
     } else if (cls === "disabled" && value === "on") {
       glyph = "eye"; color = TC.strokeMid; dashed = true;
     } else if (cls === "disabled" && value === "off") {
       glyph = "eyeClosed"; color = TC.strokeMid; dashed = true;
     } else if (cls === "disabled-inherited" && value === "on") {
-      // Disabled+Inherited ON: strokeMid dashed, no backing (not Locked).
-      glyph = "eye"; color = TC.strokeMid; dashed = true;
+      // Disabled+Inherited ON: backMid stroke (4B4B4E) + dashed — paired with OFF.
+      // Distinguishes tier from plain Disabled ON (strokeMid 7C7C83).
+      glyph = "eye"; color = TC.backMid; dashed = true;
     } else if (cls === "disabled-inherited" && value === "off") {
-      // Disabled+Inherited OFF: strokeMid dashed, no backing.
+      // Disabled+Inherited OFF: backMid stroke + dashed, no backing.
       glyph = "eyeClosed"; color = TC.backMid; dashed = true;
     } else if (cls === "disabled-locked" && value === "on") {
       // Reserved tier — backDim подложка + backMid stroke distinguishes from
       // Disabled+Inherited.
       glyph = "eye"; color = TC.backMid; backing = TC.backDim; dashed = true;
+    } else if (cls === "disabled-locked" && value === "off") {
+      // NEW: Disabled+Locked OFF — backMid stroke (dashed) + backDim gradient on arc.
+      glyph = "eyeClosed"; color = TC.backMid; arcGradient = TC.backDim; dashed = true;
     }
 
     const g = loadIcon(glyph, color, glyphSize);
-    if (backing) applyBodyBacking(g, glyph, backing);
-    if (dashed)  applyBodyDash(g, glyph);
+    if (backing)     applyBodyBacking(g, glyph, backing);
+    if (dashed)      applyBodyDash(g, glyph);
+    if (arcGradient) applyBodyGradient(g, glyph, arcGradient);
     wrap.appendChild(g);
     return wrap;
   }
@@ -1529,7 +1556,7 @@ async function main() {
       wrap.primaryAxisAlignItems = "CENTER"; wrap.counterAxisAlignItems = "CENTER";
       wrap.fills = [];
       const gs = 14;
-      let glyph, color, backing = null, dashed = false;
+      let glyph, color, backing = null, dashed = false, arcGradient = null;
       if (cls === "overridden" && value === "on") {
         glyph = "eye"; color = Ct.accent;
       } else if (cls === "overridden" && value === "off") {
@@ -1540,20 +1567,32 @@ async function main() {
         glyph = "eyeClosed"; color = Ct.strokeMid;
       } else if (cls === "locked" && value === "on") {
         glyph = "eye"; color = Ct.strokeMid; backing = Ct.backMid;
+      } else if (cls === "locked" && value === "off") {
+        // NEW: Locked OFF — inherited-off base + backMid gradient on arc.
+        // Race-prevention visual (Busy, parent hard-lock etc.).
+        glyph = "eyeClosed"; color = Ct.strokeMid; arcGradient = Ct.backMid;
       } else if (cls === "disabled" && value === "on") {
         glyph = "eye"; color = Ct.strokeMid; dashed = true;
       } else if (cls === "disabled" && value === "off") {
         glyph = "eyeClosed"; color = Ct.strokeMid; dashed = true;
       } else if (cls === "disabled-inherited" && value === "on") {
-        glyph = "eye"; color = Ct.strokeMid; dashed = true;
+        // backMid (4B4B4E) stroke + dashed — paired with OFF variant.
+        // Distinguishes tier from plain Disabled ON (strokeMid).
+        glyph = "eye"; color = Ct.backMid; dashed = true;
       } else if (cls === "disabled-inherited" && value === "off") {
+        // backMid (4B4B4E) stroke + dashed — dimmer than plain Inherited OFF
+        // (strokeMid 7C7C83). Brightness delta encodes the disabled axis.
         glyph = "eyeClosed"; color = Ct.backMid; dashed = true;
       } else if (cls === "disabled-locked" && value === "on") {
         glyph = "eye"; color = Ct.backMid; backing = Ct.backDim; dashed = true;
+      } else if (cls === "disabled-locked" && value === "off") {
+        // NEW: Disabled+Locked OFF — backMid stroke dashed + backDim gradient on arc.
+        glyph = "eyeClosed"; color = Ct.backMid; arcGradient = Ct.backDim; dashed = true;
       }
       const g = loadIcon(glyph, color, gs);
-      if (backing) applyBodyBacking(g, glyph, backing);
-      if (dashed)  applyBodyDash(g, glyph);
+      if (backing)     applyBodyBacking(g, glyph, backing);
+      if (dashed)      applyBodyDash(g, glyph);
+      if (arcGradient) applyBodyGradient(g, glyph, arcGradient);
       wrap.appendChild(g);
       return wrap;
     }
@@ -1575,6 +1614,23 @@ async function main() {
       if (body && "dashPattern" in body) {
         body.dashPattern = [1.5, 1.5];
       }
+    }
+
+    // applyBodyGradient — fills eyeClosed arc with top→bottom vertical gradient
+    // (top 0% alpha → bottom 100% alpha, same color). Used for Locked-OFF and
+    // Disabled+Locked-OFF eye variants.
+    function applyBodyGradient(node, glyph, colorRGB) {
+      if (!("children" in node) || !Array.isArray(node.children)) return;
+      const body = node.children[bodyChildIndex(glyph)];
+      if (!body || !("fills" in body)) return;
+      body.fills = [{
+        type: "GRADIENT_LINEAR",
+        gradientTransform: [[0, 1, 0], [-1, 0, 1]],
+        gradientStops: [
+          { position: 0, color: { r: colorRGB.r, g: colorRGB.g, b: colorRGB.b, a: 0 } },
+          { position: 1, color: { r: colorRGB.r, g: colorRGB.g, b: colorRGB.b, a: 1 } },
+        ],
+      }];
     }
 
     function naCell() { return txt("—", F.r, 12, Ct.strokeMid); }
@@ -1784,9 +1840,9 @@ async function main() {
         "Ancestor cascades its value (open or closed) as SOFT INHERIT — descendants echo it, but may individually override to the opposite. Bare glyph + strokeMid outline, no подложка. Both ON and OFF are valid. Clickable — click promotes to Normal (the cell pins its own value)."
       ),
       legendRow(
-        eye("locked", "on"), naCell(),
+        eye("locked", "on"), eye("locked", "off"),
         "Locked",
-        "**Reserved — mechanism preserved for future use. Not produced by current cascade.** Open ancestor would cascade as HARD LOCK (forced open, not clickable) if this tier were activated. Bare eye-open glyph with strokeMid outline and a backMid «подложка» painted inside the eye body path — the fill is the lock signal, not a container box. Kept in engine for potential future need (e.g. admin-locked shared libraries). No OFF variant."
+        "Cascade-lock tier — now with full ON/OFF support. **ON**: eye-open with strokeMid outline + backMid «подложка» (body fill). **OFF (new 2026-04-22)**: eye-closed with strokeMid outline + backMid vertical gradient on the arc (top 0% alpha → bottom 100% alpha — gives the closed eyelid a weighty pressed-down look). Used for race-prevention during Busy (import in-flight) and for future admin-locked scenarios. Not clickable in either state."
       ),
       legendRow(
         eye("disabled", "on"), eye("disabled", "off"),
@@ -1799,22 +1855,22 @@ async function main() {
         "Row is off AND the stored value is Inherited from an ancestor. Bare glyph, strokeMid outline, dashed body, no подложка — distinguishes from Disabled+Locked (which has a backDim body fill). Both ON and OFF are valid. Clicks are still accepted — they set a local override that takes effect when the row re-enables."
       ),
       legendRow(
-        eye("disabled-locked", "on"), naCell(),
+        eye("disabled-locked", "on"), eye("disabled-locked", "off"),
         "Disabled + Locked (row off)",
-        "**Reserved — mechanism preserved for future use. Not produced by current cascade.** Composite of Disabled (row off) + Locked (hard-lock from ancestor). Bare eye-open glyph, backMid outline, backDim «подложка» painted in the body path, and the body path is dashed while the pupil stays solid — darker echo of plain Locked ON plus the Disabled dashed-body marker. Not clickable even while the row is off — Locked wins. No OFF variant."
+        "Composite of Disabled + Locked — now with full ON/OFF support. **ON**: eye-open, backMid outline, backDim «подложка» body fill, dashed body — darker echo of Locked ON. **OFF (new 2026-04-22)**: eye-closed, backMid outline (dashed), backDim vertical gradient on the arc — darker echo of the new Locked-OFF. Not clickable — Locked wins over Disabled click-acceptance."
       ),
       legendRow(
         txt("N/A", F.m, 10, Ct.strokeMid), coverStripCell(),
         "Safety Cover Countdown",
-        "Same overlay mechanic as the checkbox table — applies wherever the cell accepts clicks: Normal (both ON and OFF), Inherited (both ON and OFF), Disabled (both ON and OFF), Disabled+Inherited (both ON and OFF). Excluded from Locked ON and Disabled+Locked ON (reserved tiers — source owns the value). The cover wraps the 20×20 click target of the cell. First click arms, drains over ~3s, second click commits; timeout re-locks. Red only during the armed countdown."
+        "Same overlay mechanic as the checkbox table — applies wherever the cell accepts clicks: Normal (both ON and OFF), Inherited (both ON and OFF), Disabled (both ON and OFF), Disabled+Inherited (both ON and OFF). Excluded from Locked (both ON and OFF) and Disabled+Locked (both ON and OFF) — source owns the value, nothing to gate. The cover wraps the 20×20 click target of the cell. First click arms, drains over ~3s, second click commits; timeout re-locks. Red only during the armed countdown."
       ),
     ];
 
     const eyeTable = buildTable(
       "Eye state taxonomy + Safety Cover",
-      "Same base classes as the checkbox table (Normal / Inherited / Disabled + Disabled+Inherited compound). Cascade is SYMMETRIC through Inherited — both open and closed ancestor eye cascade as Inherited (soft), descendants may individually override. Locked and Disabled+Locked tiers remain in the engine as reserved mechanisms (admin/shared-library scenarios) but are not produced by current cascade logic. Eye glyphs carry no container chrome — class signal lives inside the glyph via in-path stylings: outline colour, optional body «подложка» (Locked tiers only), optional dashPattern (Disabled tiers). Pupil and lashes always solid. Only Normal ON carries accent.",
+      "Base classes: Normal / Inherited / Locked / Disabled (+ compound Disabled+Inherited / Disabled+Locked). Locked now has full ON/OFF coverage (2026-04-22) — OFF uses a backMid vertical gradient on the arc for a \"weighty pressed eyelid\" look. Cascade via Inherited is SYMMETRIC (soft for both open and closed). Locked tiers are produced by race-prevention during Busy (import in-flight) and reserved for future admin-locked scenarios. Glyphs carry no container chrome — class signal lives inside: outline colour, optional body «подложка» solid fill (Locked ON, Disabled+Locked ON), optional gradient on arc (Locked OFF, Disabled+Locked OFF), optional dashPattern (every Disabled tier). Pupil/lashes always solid.",
       eyeRows,
-      "Symmetry matches the checkbox table: cascade is uniform across value (open/closed), user always retains override on descendant. Locked tiers kept in engine as opt-in reserved mechanism — today no call-site produces them. Same red-during-armed-window rule applies; reserved Locked tiers exclude cover (source owns value)."
+      "Locked ON/OFF tiers both produced by Busy race-prevention and reserved for admin scenarios. Same red-during-armed-window rule applies; Locked tiers exclude cover (source owns value, nothing to gate)."
     );
 
     // ---------- Icon button states — Adobe parity ----------
