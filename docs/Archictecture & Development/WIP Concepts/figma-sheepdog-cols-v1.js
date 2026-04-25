@@ -1039,6 +1039,11 @@ async function main() {
     wrap.appendChild(colHeaderCell(COL.STATE, "ST",     "CENTER"));
     wrap.appendChild(colHeaderCell(COL.NAME,  "NAME",   "MIN", C.textDim));
     wrap.appendChild(colHeaderCell(COL.PATH,  "PATH",   "MIN"));
+    // Flex spacer — absorbs slack between PATH and right-pinned cluster
+    // (SUB onward), pushing cluster to the right edge per Mockup.png target.
+    const headerFlex = spacer(1, 1);
+    wrap.appendChild(headerFlex);
+    headerFlex.layoutGrow = 1;
     wrap.appendChild(colHeaderCell(COL.SUB,   "SUB",    "CENTER"));
     wrap.appendChild(colHeaderCell(COL.REL,   "REL",    "CENTER"));
     wrap.appendChild(colHeaderCell(COL.SEQ,   "SEQ",    "CENTER"));
@@ -1174,6 +1179,12 @@ async function main() {
     pathInner.appendChild(txt(cfg.path, pathFont, 11, pathColor));
     pathBox.appendChild(pathInner);
     r.appendChild(pathBox);
+
+    // Flex spacer — pushes right-pinned cluster (SUB onward) to right edge.
+    // Mirrors columnHeaderBar so headers + row content stay column-aligned.
+    const rowFlex = spacer(1, 1);
+    r.appendChild(rowFlex);
+    rowFlex.layoutGrow = 1;
 
     r.appendChild(cell(COL.SUB, checkbox(cfg.sub, cfg.subLocked)));
     r.appendChild(cell(COL.REL, checkbox(cfg.rel, cfg.subLocked)));
