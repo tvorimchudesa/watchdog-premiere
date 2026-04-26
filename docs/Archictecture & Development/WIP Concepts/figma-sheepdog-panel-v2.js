@@ -1064,9 +1064,14 @@ async function main() {
     wrap.counterAxisAlignItems = "CENTER";
     setFill(wrap, C.panelAlt, 1);
 
-    wrap.appendChild(colHeaderCell(COL.STATE, "STATE",  "CENTER"));
+    wrap.appendChild(colHeaderCell(COL.STATE, "ST",     "CENTER"));
     wrap.appendChild(colHeaderCell(COL.NAME,  "NAME",   "MIN", C.textDim));
     wrap.appendChild(colHeaderCell(COL.PATH,  "PATH",   "MIN"));
+    // Flex spacer — absorbs slack between PATH and right-pinned cluster
+    // (SUB onward), pushing cluster to the right edge per Mockup.png target.
+    const headerFlex = spacer(1, 1);
+    wrap.appendChild(headerFlex);
+    headerFlex.layoutGrow = 1;
     wrap.appendChild(colHeaderCell(COL.SUB,   "SUB",    "CENTER"));
     wrap.appendChild(colHeaderCell(COL.REL,   "REL",    "CENTER"));
     wrap.appendChild(colHeaderCell(COL.SEQ,   "SEQ",    "CENTER"));
@@ -1203,6 +1208,12 @@ async function main() {
     pathBox.appendChild(pathInner);
     r.appendChild(pathBox);
 
+    // Flex spacer — pushes right-pinned cluster (SUB onward) to right edge.
+    // Mirrors columnHeaderBar so headers + row content stay column-aligned.
+    const rowFlex = spacer(1, 1);
+    r.appendChild(rowFlex);
+    rowFlex.layoutGrow = 1;
+
     r.appendChild(cell(COL.SUB, checkbox(cfg.sub, cfg.subLocked)));
     r.appendChild(cell(COL.REL, checkbox(cfg.rel, cfg.subLocked)));
     r.appendChild(cell(COL.SEQ, checkbox(cfg.seq, cfg.subLocked)));
@@ -1321,8 +1332,13 @@ async function main() {
     wrap.counterAxisAlignItems = "CENTER";
     setFill(wrap, C.panelAlt, 1);
 
-    wrap.appendChild(colHeaderCell(COL.STATE,    "STATE", "CENTER"));
+    wrap.appendChild(colHeaderCell(COL.STATE,    "ST",    "CENTER"));
     wrap.appendChild(colHeaderCell(COL_SIMP_NAME, "NAME",  "MIN", C.textDim));
+    // Flex spacer — pushes right-pinned cluster (LNK · LBL · ×) to the right
+    // edge, mirroring Advanced columnHeaderBar.
+    const headerFlexS = spacer(1, 1);
+    wrap.appendChild(headerFlexS);
+    headerFlexS.layoutGrow = 1;
     wrap.appendChild(colHeaderCell(COL_SIMP_ACT, "LNK",   "CENTER"));
     wrap.appendChild(colHeaderCell(COL.LABEL,    "LBL",   "CENTER"));
     wrap.appendChild(colHeaderCell(COL.RM,       "",      "CENTER"));
@@ -1371,6 +1387,12 @@ async function main() {
     nameInner.appendChild(txt(cfg.name, nameFont, 12, nameColor));
     nameBox.appendChild(nameInner);
     r.appendChild(nameBox);
+
+    // Flex spacer — pushes LNK · LBL · × to right edge.
+    // Mirrors columnHeaderBarSimplified so headers + row content stay column-aligned.
+    const rowFlexS = spacer(1, 1);
+    r.appendChild(rowFlexS);
+    rowFlexS.layoutGrow = 1;
 
     const actColor = (cfg.stateIndicator === "disabled"
                    || cfg.stateIndicator === "missing"
@@ -1915,6 +1937,85 @@ async function main() {
       demo: demoBox(86, 18, txt("rule", F.s, 10, C.textDim)),
       title: "Implementation in row()",
       desc: "pathColor = cfg.pathColor || (isPathMissing ? C.danger : nameColor). One line, two signals: \"missing wins for path\", otherwise \"path follows identity\". User-supplied cfg.pathColor still overrides for special cases.",
+    },
+  ]));
+
+  // ── ANNOTATION CARD: Column architecture — fixed lanes + flexible identity ──
+  // LEAN demos: chip() + txt() only. No bare figma.createFrame() inside IIFEs
+  // (that handcrafted-frame pattern caused 70% panel collapse in earlier draft).
+  ann1.appendChild(annCard("Column architecture — fixed lanes + flexible identity", C.borderBright, [
+    {
+      demo: demoBox(86, 18, (function() {
+        const g = hHug();
+        g.itemSpacing = 4;
+        g.counterAxisAlignItems = "CENTER";
+        g.appendChild(chip("ST", C.accent, 0.18));
+        g.appendChild(txt("← left", F.r, 9, C.textDim));
+        return g;
+      })()),
+      title: "ST — left-pinned, fixed 32px",
+      desc: "State LED column hugs the left edge. Width fixed. Not user-resizable, never hides. Always the first glyph users scan when reading a row.",
+    },
+    {
+      demo: demoBox(86, 18, (function() {
+        const g = hHug();
+        g.itemSpacing = 3;
+        g.counterAxisAlignItems = "CENTER";
+        g.appendChild(chip("SUB", C.borderBright, 0.10));
+        g.appendChild(chip("…", C.borderBright, 0.10));
+        g.appendChild(chip("LBL", C.borderBright, 0.10));
+        return g;
+      })()),
+      title: "Right-pinned cluster — locked order, locked widths",
+      desc: "SUB · REL · SEQ · FLT · EYE · ACTIONS · LBL · × (and DEL when Danger zone enables) — sit against right edge in this exact order. Cannot be reordered, resized, or moved. Headers center over their content.",
+    },
+    {
+      demo: demoBox(86, 18, (function() {
+        const g = hHug();
+        g.itemSpacing = 4;
+        g.counterAxisAlignItems = "CENTER";
+        g.appendChild(chip("NAME", C.amber, 0.18));
+        g.appendChild(txt("⇿", F.b, 11, C.amber));
+        g.appendChild(chip("PATH", C.amber, 0.18));
+        return g;
+      })()),
+      title: "NAME ⇿ PATH — flexible, only the divider is draggable",
+      desc: "Together absorb all space between ST and right cluster. User drags the SEPARATOR to reallocate width — neither hides, both always visible.",
+    },
+    {
+      demo: demoBox(86, 18, (function() {
+        const g = hHug();
+        g.itemSpacing = 6;
+        g.counterAxisAlignItems = "CENTER";
+        g.appendChild(txt("⇔", F.b, 14, C.accent));
+        g.appendChild(txt("window", F.m, 10, C.textDim));
+        return g;
+      })()),
+      title: "Adaptive — panel reflows with window",
+      desc: "Whole panel grows/shrinks with window. NAME ⇿ PATH expand proportionally, keeping user-set divider ratio. ST + right widths constant.",
+    },
+    {
+      demo: demoBox(86, 18, (function() {
+        const g = hHug();
+        g.itemSpacing = 3;
+        g.counterAxisAlignItems = "CENTER";
+        g.appendChild(chip("×", C.strokeMid, 0.18));
+        g.appendChild(chip("LBL", C.strokeMid, 0.18));
+        g.appendChild(chip("ACT", C.strokeMid, 0.18));
+        return g;
+      })()),
+      title: "Narrow window → rightmost columns hide first",
+      desc: "Shed order: × → LBL → ACTIONS → EYE → FLT → SEQ → REL → SUB. NAME, PATH, ST never hide. Hidden columns surface via row hover (parked).",
+    },
+    {
+      demo: demoBox(86, 18, txt("Simplified", F.s, 10, C.textDim)),
+      title: "Simplified mode — nothing draggable",
+      desc: "Per Tier A: only window resize matters. NAME⇿LNK separator fixed (no PATH in Simplified). Removes \"how do I reset my drag?\" failure mode for casual users.",
+    },
+    {
+      demo: demoBox(86, 18, txt("rule", F.s, 10, C.textDim)),
+      title: "What the user CAN touch",
+      desc: "(1) Window size — adapts everything. (2) NAME ⇿ PATH separator (Advanced only). (3) Hide filter + Sort — change which rows show, not column geometry. Everything else locked by design.",
     },
   ]));
 
