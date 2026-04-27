@@ -1,9 +1,0 @@
-# svgo intermediate stages — kept locally for inspection, not for repo
-*.opt.svg
-*.merged.svg
-
-# pixel-analysis scratch (ffmpeg downsamples — derivable, not reusable)
-_pixel_analysis/
-
-# old name with spaces — superseded by 8bitSheepFace.svg (no spaces)
-8bit Sheep Face*
