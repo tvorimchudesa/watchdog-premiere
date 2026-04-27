@@ -122,6 +122,12 @@ async function main() {
     x:            '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
   };
 
+  // SheepDog 8-bit pixel-art logo — 14×12 source pixels, native 168×144 SVG.
+  // Source: Plugin logo/sheepdog-logo.svg (svgo-merged, 5 paths by fill).
+  // 5 colors: outline #2e2e36, wool #ededf2, ears #f5b3c7, eyes #1a1a21, nose #eb8ca6.
+  // Used in panelHeader / panelHeaderSimplified — replaces the original blue "S" dot.
+  const SVG_LOGO_SHEEP = `<svg xmlns="http://www.w3.org/2000/svg" width="168" height="144" fill="none" viewBox="0 0 168 144"><path fill="#2e2e36" d="M48 0h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zM36 12h12v12H36zm84 0h12v12h-12zM24 24h12v12H24zm-12 0h12v12H12zm120 0h12v12h-12zm12 0h12v12h-12zM12 60h12v12H12zm24 0h12v12H36zm84 0h12v12h-12zm24 0h12v12h-12zM12 72h12v12H12zm132 0h12v12h-12zM12 84h12v12H12zm132 0h12v12h-12zM12 96h12v12H12zm132 0h12v12h-12zM24 108h12v12H24zm108 0h12v12h-12zm-96 12h12v12H36zm84 0h12v12h-12zm-72 12h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zm48-84h12v12h-12zm0-12h12v12h-12zM0 48h12v12H0zm0-12h12v12H0z"/><path fill="#ededf2" d="M48 12h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zM36 24h12v12H36zm12 0h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zm12 0h12v12h-12zM36 36h12v12H36zm12 0h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zm12 0h12v12h-12zM24 48h12v12H24zm12 0h12v12H36zm12 0h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zm12 0h12v12h-12zm12 0h12v12h-12zM24 60h12v12H24zm36 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm36 0h12v12h-12zM24 72h12v12H24zm12 0h12v12H36zm12 0h12v12H48zm24 0h12v12H72zm12 0h12v12H84zm24 0h12v12h-12zm-12 0h12v12H96zm-36 0h12v12H60zm60 0h12v12h-12zm12 0h12v12h-12zM24 84h12v12H24zm12 0h12v12H36zm12 0h12v12H48zm12 0h12v12H60zm36 0h12v12H96zm12 0h12v12h-12zm12 0h12v12h-12zm12 0h12v12h-12zM24 96h12v12H24zm12 0h12v12H36zm12 0h12v12H48zm12 0h12v12H60zm36 0h12v12H96zm12 0h12v12h-12zm12 0h12v12h-12zm12 0h12v12h-12zm-96 12h12v12H36zm12 0h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12zm12 0h12v12h-12zm-72 12h12v12H48zm12 0h12v12H60zm12 0h12v12H72zm12 0h12v12H84zm12 0h12v12H96zm12 0h12v12h-12z"/><path fill="#f5b3c7" d="M24 36h12v12H24zm-12 0h12v12H12zm0 12h12v12H12zm120-12h12v12h-12zm12 0h12v12h-12zm0 12h12v12h-12zM84 96h12v12H84zm-12 0h12v12H72z"/><path fill="#1a1a21" d="M48 60h12v12H48zm60 0h12v12h-12z"/><path fill="#eb8ca6" d="M72 84h12v12H72zm12 0h12v12H84z"/></svg>`;
+
   // ========================================================================
   // HELPERS
   // ========================================================================
@@ -163,6 +169,18 @@ async function main() {
     f.resize(size, size);
     rescaleStrokes(f, size / 24);
     recolor(f, color);
+    return f;
+  }
+
+  // sheepLogoNode(targetH) — render the multi-color 8-bit sheep logo at a given
+  // height. Native SVG is 168×144 (aspect 7:6), so width = round(targetH × 7/6).
+  // Multi-color (5 fills) — does NOT recolor to single ink, fills are preserved.
+  function sheepLogoNode(targetH) {
+    const NATIVE_W = 168, NATIVE_H = 144;
+    const w = Math.round(targetH * (NATIVE_W / NATIVE_H));
+    const f = figma.createNodeFromSvg(SVG_LOGO_SHEEP);
+    f.fills = [];
+    f.resize(w, targetH);
     return f;
   }
 
@@ -1001,17 +1019,7 @@ async function main() {
     const logoBox = hHug();
     logoBox.itemSpacing = 8;
     logoBox.counterAxisAlignItems = "CENTER";
-    const logoDot = figma.createFrame();
-    logoDot.resize(18, 18);
-    logoDot.cornerRadius = 4;
-    setFill(logoDot, C.accent, 1);
-    logoDot.layoutMode = "HORIZONTAL";
-    logoDot.layoutSizingHorizontal = "FIXED";
-    logoDot.layoutSizingVertical = "FIXED";
-    logoDot.primaryAxisAlignItems = "CENTER";
-    logoDot.counterAxisAlignItems = "CENTER";
-    logoDot.appendChild(txt("S", F.b, 10, C.white));
-    logoBox.appendChild(logoDot);
+    logoBox.appendChild(sheepLogoNode(18));
     logoBox.appendChild(txt("SheepDog", F.b, 13, C.borderBright));
     wrap.appendChild(logoBox);
 
@@ -1283,16 +1291,7 @@ async function main() {
     const logoBox = hHug();
     logoBox.itemSpacing = 8;
     logoBox.counterAxisAlignItems = "CENTER";
-    const logoDot = figma.createFrame();
-    logoDot.resize(18, 18); logoDot.cornerRadius = 4;
-    setFill(logoDot, C.accent, 1);
-    logoDot.layoutMode = "HORIZONTAL";
-    logoDot.layoutSizingHorizontal = "FIXED";
-    logoDot.layoutSizingVertical = "FIXED";
-    logoDot.primaryAxisAlignItems = "CENTER";
-    logoDot.counterAxisAlignItems = "CENTER";
-    logoDot.appendChild(txt("S", F.b, 10, C.white));
-    logoBox.appendChild(logoDot);
+    logoBox.appendChild(sheepLogoNode(18));
     logoBox.appendChild(txt("SheepDog", F.b, 13, C.borderBright));
     wrap.appendChild(logoBox);
 
