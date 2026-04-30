@@ -1,16 +1,22 @@
 # SheepDog — State Design v1 (WIP, 2026-04-22)
 
-> **Цель документа**: зафиксировать state-модель, принятые решения и design debt. Primary handoff artifact — читать вместе с [sheepdog-state-axes-v1.csv](sheepdog-state-axes-v1.csv) и [sheepdog-state-matrix-v1.csv](sheepdog-state-matrix-v1.csv).
+> **Цель документа**: зафиксировать state-модель, принятые решения и design debt. Primary handoff artifacts — читать вместе с:
+> - [state-axes.csv](state-axes.csv) — 3 state axes + 3 settings axes + parked plugin axis
+> - [state-matrix.csv](state-matrix.csv) — 4 states S1–S4 + parked S5
+> - [mirror-decisions.csv](mirror-decisions.csv) — 16-case Premiere↔FS violation matrix (en SOT)
+> - [mirror-decisions.ru.csv](mirror-decisions.ru.csv) — то же по-русски (тождественная структура)
+> - [parked-notes.md](parked-notes.md) — active contracts + design debt + decision history
 
 ---
 
 ## Где мы в работе
 
-**Фаза 1 — Taxonomy (done)**: оси состояния → `sheepdog-state-axes-v1.csv`.
-**Фаза 2 — Behavior matrix (done)**: cases → `sheepdog-state-matrix-v1.csv`.
-**Фаза 3a — Transitions diagram (superseded)**: excalidraw версия была сгенерирована, но отвергнута — смешивала **причины** с **состояниями**. Оставлена в репо исторически, под рабочую версию не годится.
+**Фаза 1 — Taxonomy (done)**: оси состояния → `state-axes.csv`.
+**Фаза 2 — Behavior matrix (done)**: cases → `state-matrix.csv`.
+**Фаза 3a — Transitions diagram (superseded)**: excalidraw версия была сгенерирована, но отвергнута — смешивала **причины** с **состояниями**. Перемещена в archive.
 **Фаза 3b — State-model simplification (done, 2026-04-22)**: модель схлопнута с 11 cases до 4+1. Ключевое решение — разделить **state axes** (3) от **intent settings** (3).
-**Фаза 4 — Visual handoff (next)**: figma scripter `figma-sheepdog-states-v1.js` на базе v1.2 панели из section 1. Рендерит 4 кейса (Healthy / Busy / Disabled / Missing) с новой колонкой STATE в panel row.
+**Фаза 3c — Mirror architecture (done, 2026-04-30)**: 16-case Premiere↔FS violation matrix → `mirror-decisions.csv`. Two-axes model (drift / paused), Mirror DEL via diff + safety hierarchy, Simplified.broken event-trigger, Source/Bin Name display toggle, +S6 Drifted state. См. §16 + parked-notes.md.
+**Фаза 4 — Visual handoff (in progress)**: figma scripter `mockups/panel/panel.figma-script.js` (v2). Рендерит 4 base states + S6 Drifted + autoimport-paused sub-state с новой колонкой STATE в panel row.
 
 ---
 
@@ -18,13 +24,14 @@
 
 Модель разделяет **что влияет** (causes / settings) и **наблюдаемое состояние** (states).
 
-### State axes (3 — наблюдаемая категория)
+### State axes (4 — наблюдаемая категория)
 
 Priority order (при конфликте выигрывает low rank):
 
 1. **path** — `ok` / `missing(subtype)` — **Missing supersedes всё**
-2. **enabled** — `yes` / `no` — **Disabled supersedes Busy** (disabled row не в очереди на импорт)
+2. **enabled** — `yes` / `no` — **Disabled supersedes Busy/Drifted** (disabled row не в очереди на импорт)
 3. **busy** — `idle` / `active` — транзитный лок во время in-flight import
+4. **sot_parity** — `intact` / `drifted` — Premiere bin tree ≠ FS folder layout. Surfaces только когда нет higher-priority state (см. §16 Axis A)
 
 ### Settings axes (3 — orthogonal, не меняют state)
 
@@ -32,15 +39,18 @@ Priority order (при конфликте выигрывает low rank):
 - **SUB** — recursion control (не state own row, но cascade = cause для `enabled=no` детей)
 - **LBL** — label text/color
 
-### 4 states (+ 1 parked)
+### 5 states (+ 1 parked)
 
 | id | state | cause | indicator |
 |---|---|---|---|
 | S1 | **Healthy** | baseline | none (subtle activity dot optional) |
 | S2 | **Busy** | import in-flight (auto OR manual Sync) | spinner + N/M counter |
 | S3 | **Disabled** | own × / parent SUB=off / parent enabled=no | row-level dashed visual |
-| S4 | **Missing** | path enoent / offline / eacces / other | red lamp + subtype tooltip |
+| S4 | **Missing** | path enoent / offline / eacces / other (folder-level only — см. §9) | red lamp + subtype tooltip |
 | S5 | Plugin Unhealthy (parked v1.1+) | Premiere recovery block etc. | global panel indicator |
+| S6 | **Drifted** | Premiere bin tree ≠ FS folder layout (clips moved out of place / dedup'd to wrong bin) — см. §16 Axis A | 4px solid accentFill (dark blue), cascade up to root |
+
+**Sub-state of Healthy**: `autoimport-paused` — eye stored=off after autoimport-pause event (Axis B violation, см. §16). Row остаётся `healthy`, signal через eye-closed glyph + Simplified red toggle bg.
 
 ---
 
@@ -88,6 +98,8 @@ Offline old path → ghost не создаётся.
 
 ### 9. Missing — runtime off, mgmt alive
 Path unreachable kills runtime. Но management actions остаются: `×`, `Relink` (primary!), `LBL editable`. Relink на Missing — самый важный use-case. Toggles визуально кликабельны (stored-not-apply).
+
+**Folder-level only**. Single-file FS deletion (file gone, folder still alive) — это **Premiere's responsibility**: clip отображается offline через native Premiere offline-reference UI. Plugin не intervenes на file-level — row остаётся `healthy`, юзер relink-ит clip в Premiere native UI или удаляет clip из bin (тогда case #2 Coverage violation срабатывает). См. mirror-decisions.csv case #7.
 
 ### 10. Missing subtypes (parked)
 Типы path errors для MVP:
@@ -189,7 +201,7 @@ Progressive-disclosure pattern для двух ключевых юзер-сег�
 
 **Simplified columns** (default view) — **Tier A minimum (2026-04-23)**:
 - STATE LED
-- NAME (with chevron prefix, hover-tooltip reveals full path)
+- SOURCE NAME (with chevron prefix, hover-tooltip reveals full path; column header chevron ▾ → RMB context menu для display mode toggle, см. ниже)
 - LNK (⌕ relink, dedicated column, always visible, never red)
 - LBL (color dot)
 - ×
@@ -209,7 +221,7 @@ Progressive-disclosure pattern для двух ключевых юзер-сег�
 | column | behavior |
 |---|---|
 | STATE LED | всегда visible (critical signal для missing detection) |
-| NAME | chevron left-sticky. Hover → full path tooltip |
+| SOURCE NAME | chevron left-sticky. Hover → full path tooltip. Column header gestures: ЛКМ = sort (стандарт), RMB → context menu с toggle "Source Name / Bin Name" (см. ниже). Display switches между FS-derived именем (default) и Premiere bin label (custom rename allowed) |
 | LNK (⌕) | always visible. Color borderBright on healthy/active, strokeMid on disabled/missing/busy. Click = relink flow |
 | LBL | per-row color label — remains visible, organization |
 | × | remove (root) / force-disable (child) — remains visible (disabled visual during Busy) |
@@ -256,6 +268,16 @@ Earlier proposal had ⌕ inline after NAME text on Missing rows only. Revised to
 Hover any row's NAME → tooltip shows full path. Consistent gesture (hover = inspect). Works одинаково на all states. Tooltip render: standard styled (C.canvas bg, C.border stroke, F.r 11 C.text), single line unless very long.
 
 Не duplicated с LNK (⌕ = action — relink, tooltip = inspect — show path). Two different intents, two different gestures.
+
+#### Source Name / Bin Name display toggle
+
+Custom bin labels в Premiere allowed (юзер может переименовать bin для cosmetic clarity без drift triggering — см. mirror-decisions case #12). Plugin внутренне always knows оба имени:
+- **Source Name** (default) — FS-derived имя (basename папки на диске, source-of-truth)
+- **Bin Name** — текущий Premiere bin label (display attribute, может быть user-renamed)
+
+**Gesture**: column header `SOURCE NAME ▾` — chevron indicator. ЛКМ на header = sort by current display mode. RMB на header → context menu → toggle **"Show Bin Name"** / **"Show Source Name"**. Display переключается на ВСЕХ rows, persistent в config.
+
+**Mapping invariant**: внутреннее identity row binding идёт через Premiere internal bin ID, не через label. Rename bin в Premiere → label changes, identity intact, autoimport keeps working. Это case #12 → silent healthy. См. также §16 Axiom (label change ≠ Axis A drift).
 
 #### Target use case coverage
 
@@ -363,11 +385,23 @@ Describes what SheepDog owns vs what OS owns. Governs all destructive/modifying 
 
 Exceptions to the "SheepDog read-only on disk" rule:
 
-1. **Mirror DEL** (parked, Settings toggle): when юзер deletes bin в Premiere → plugin cascades delete файла на disk. Requires explicit opt-in в global Settings; OFF by default. Destructive action, double-gated by toggle + Premiere-side user intent.
+1. **Mirror DEL** (MVP feature, three-way handshake): when юзер deletes bin в Premiere AND row's `DEL=on` AND global `Mirror DEL master=on` → plugin cascades delete файлов на disk через OS trash (recoverable, не permanent). Triple-gated by toggle stack + Premiere-side user intent. **Always hidden в Simplified** (§13 decision #41) — destructive feature не surfaces в Easy mode. Execution is **diff-based** — см. ниже.
 
 2. **Relink** (future): moving folder in OS → plugin offers relink, but НЕ автоматически moves files itself. User does OS move, plugin adjusts config.
 
 3. **ImportFiles** (standard): plugin calls Premiere API to add files to bin. Premiere owns the bin modification.
+
+#### Mirror DEL — diff-based execution + safety hierarchy
+
+Mirror DEL fires per Premiere bin-delete event under 3-way handshake. Execution is **diff-based** между pre-delete manifest (full FS knowledge incl. dedup-rejected entries) и post-delete Premiere bin contents. Diff categorized по safety hierarchy:
+
+| tier | condition | action |
+|---|---|---|
+| **TRUSTED** | diff matches expected pattern (clean delete of bin / file via right-click) | proceed → OS trash with 5s cancellable timer |
+| **SUSPICIOUS** | manifest stale / diff has unexpected gaps / dedup-injected clips elsewhere | **import wins** — autoimport re-imports instead of trashing. Better over-represent than nuke files юзер не хотел удалять |
+| **BROKEN** | session corrupted / manifest incoherent | abort destructive path → fall through to Coverage violation (Axis B → autoimport-paused) |
+
+**Cancellation**: 5s timer окно visible только в progress panel (countdown ring on DEL cell — PARKED visual). Cancel = un-tick DEL checkbox automatically + autoimport stops; next FS event triggers Axis B. См. [parked-notes.md](parked-notes.md) §"Active contracts: DEL diff hierarchy" для full spec.
 
 #### Implications for UX
 
@@ -396,22 +430,26 @@ The plugin **mediates** between Premiere and the FS. On the Premiere side it can
 
 A Premiere-side change that doesn't satisfy Mirror DEL conditions can still violate one of two orthogonal SoT axes:
 
-| axis | what it is | violated by | recovery tool |
-|---|---|---|---|
-| **A — Structure parity** | Premiere bin tree must be 1:1 with OS folder layout (the FS SoT) | bin/file *moved* in Premiere out of its tracked position | **Magnet** — recreates/moves bins back to SoT positions |
-| **B — Content coverage** | Autoimport policy promises "every file in tracked path is represented as a clip in the corresponding bin" | bin/file *deleted* in Premiere with eye=on (autoimport was actively maintaining coverage) | **Refresh / Check & Import** — re-imports missing clips into existing bins |
+| axis | what it is (common name) | violated by | NOT violated by | recovery tool |
+|---|---|---|---|---|
+| **A — Structure parity** *(drift — clips misplaced)* | clips для tracked FS files должны быть в bin для corresponding row | bin moved **with clips** out of parent / file dragged в чужой bin / dedup-rejected re-import (clips exist в wrong bins) | empty moved bin (nothing misplaced — case #4') / bin label rename (case #12, mapping via internal ID) / Premiere clip rename (case #5.1, cosmetic) | **Magnet** — pulls scattered clips to recreated SoT bin positions |
+| **B — Content coverage** *(paused — files w/o clips + plugin failure)* | every FS file должен быть represented as clip в right bin пока autoimport=on | bin/file deleted в Premiere with eye=on (Mirror DEL not aligned) / cancelled mid-import / non-dedup import failure (autocancel) | clips destroyed without files in FS (nothing to cover) / eye=off baseline (no policy active) | **Refresh** (manual re-import) / mode-toggle Adv↔Simplified (transient re-sync) / Advanced + manual eye flip on (full policy restore) |
 
 The two recovery tools are non-overlapping by design:
-- Magnet fixes **paths**. Doesn't re-import content beyond what's needed for structure restoration.
-- Refresh fixes **content**. Operates only on existing bins; doesn't recreate moved/deleted bins.
+- **Magnet** fixes **paths** (Axis A only). Doesn't re-import content beyond restoring structure.
+- **Refresh** fixes **content** (Axis B only). Operates на existing bins; doesn't recreate moved/deleted bins.
 
-Two-step recovery is explicit when both axes are violated (move + delete content): Magnet first (rebuild structure), then Refresh (refill content).
+Two-step recovery is explicit when both axes violated (move WITH clips + delete content): Magnet first (rebuild structure + recreate empty bin in SoT position), then Refresh (refill content).
+
+**Two-step recovery distinction для Axis B (parked-notes contract)**: content recovery (Refresh / mode-toggle) ≠ policy recovery (Advanced + manual eye flip on). Stored eye=off persists across content-only paths — только explicit eye flip restores autoimport policy. Mediator-respectful: policy change requires per-row act.
 
 **State indicators:**
-- Axis A violated → row state = `drifted` (yellow LED, hollow 6px)
-- Axis B violated → row's eye auto-flipped to `off` (visual: eye-closed glyph). Footer counter shows `N autoimport-paused — Refresh to resync`. Row state stays `healthy` (FS unchanged, no truth violation).
+- Axis A violated → row state = `drifted` — **4px solid `accentFill` (dark blue), cascade up to root**. Distinct visual от Missing's red 4px solid (different colors, same weight). Same indicator в Simplified и Advanced (drift = local issue, не affects mode globally).
+- Axis B violated → row's eye stored → off (visual: eye-closed glyph per-row); row state stays `healthy + autoimport-paused` (sub-state — FS unchanged, no truth violation). **Simplified layer**: any autoimport-pause event triggers `simplified.broken = true` flag → red Simplified toggle background until user-initiated recovery clears flag. Event-trigger contract (fires on ANY row's pause, not aggregated per-row). См. [parked-notes.md](parked-notes.md) §"Active contracts".
 
-**Eye=off + Premiere-side delete** = `healthy`, do nothing. No autoimport policy was active → no policy to violate.
+**Eye=off + Premiere-side delete** = `healthy`, do nothing. No autoimport policy was active → no policy to violate (case #1).
+
+**Eye=on + DEL=on + master=on + Premiere-side delete** = Mirror DEL flow → row removed (not Missing — see Asymmetric Ambiguity row). Diff categorization may downgrade к autoimport-paused if SUSPICIOUS/BROKEN.
 
 ---
 
@@ -460,7 +498,7 @@ Two-step recovery is explicit when both axes are violated (move + delete content
 | **42** | **LNK column всегда visible** vs Missing-only inline ⌕ | **Always visible column**. Predictable scan target, consistent placement. Color matches row state (never red). Inline-after-NAME pattern dropped per 2026-04-22 image |
 | **43** | **× context-aware — parent vs child vs missing** | **Parent** = delete-only (config entry, no disk). **Child healthy** = disable/enable toggle (OS owns file). **Child missing** = delete (cleanup config). Respects plugin responsibility boundary. See §14, §16 |
 | **44** | **Child delete directly from plugin?** | **Нет**. User must delete in OS first. Path becomes missing → × cleans up plugin config. Plugin does NOT touch disk except via explicit Mirror DEL opt-in |
-| **45** | **Cross-boundary delete (plugin → disk)** | Only via Mirror DEL Settings toggle (OFF by default). Parked feature. Never automatic |
+| **45** | ~~**Cross-boundary delete (plugin → disk)**~~ | **REVISED 2026-04-30**: Mirror DEL = MVP feature, three-way handshake (eye=on per row + DEL=on per row + master=on global) + diff-based execution + safety hierarchy (TRUSTED/SUSPICIOUS/BROKEN). 5s cancellable timer. См. §16 |
 | **46** | **Check & Import button — keep or drop?** | **Keep in both modes** as icon-only ↻ button на blue fill. Small, unobtrusive. Escape hatch for FS edge cases (network drives, USB, fs.watch bugs, post-crash recovery) |
 | **47** | **Hide filter — scope** | Single toggle hides **both disabled AND missing** rows. Footer shows hidden counts; missing-hidden count rendered **RED** as persistent reminder |
 | **48** | **Chevron visibility rule** | Parent с children → chevron (any visibility/state, even all hidden). Leaf → no chevron. Chevron = structural signal, not visibility signal |
@@ -468,6 +506,16 @@ Two-step recovery is explicit when both axes are violated (move + delete content
 | **36** | **⌕ placement в Simplified** | Inline после NAME text, Missing-only. Symmetric с chevron (left-stick). 14px. Zero chrome на non-Missing |
 | **37** | **EYE в Simplified** | Hidden. Globally forced ON (auto-import всё). Stored per-row values preserved, restored при switch to Advanced. No per-row EYE control в Simplified — хочешь гибкость → Advanced |
 | **38** | **REL / FLT / SEQ / SUB defaults** | Все OFF кроме SEQ=ON и SUB=ON. Set globally в Settings |
+| **50** | **Two-axes violation model** (2026-04-30) | Premiere-side change without Mirror DEL alignment violates one of 2 orthogonal SoT axes: **A — Structure parity** (drift, clips misplaced) recovered via Magnet; **B — Content coverage** (paused, files in FS without clips + plugin failure) recovered via Refresh / mode-toggle / eye flip. Non-overlapping recovery tools. См. §16 |
+| **51** | **Drifted = new state** (2026-04-30) | S6. Visual: 4px solid `accentFill` (dark blue), cascade up to root. Distinct from Missing red 4px. Same indicator в Simplified и Advanced (drift = local issue) |
+| **52** | **Empty bin moved = NOT drift** (2026-04-30) | Case #4'. Empty bin без clips → orphan instantly, recreate в SoT position при следующем FS-event. Нет drift signal because nothing misplaced (import triggers files, не folders) |
+| **53** | **Mirror DEL = MVP via diff + safety hierarchy** (2026-04-30) | Не parked. 3-way handshake gates entry; diff between pre-delete manifest и post-delete bin contents categorizes: TRUSTED → trash, SUSPICIOUS → import wins, BROKEN → autoimport-paused. См. §16 |
+| **54** | **Bin label rename = silent healthy** (2026-04-30) | Case #12. Premiere bin label = display attribute, mapping через internal bin ID. Custom labeling allowed без drift triggering |
+| **55** | **Source / Bin Name display toggle** (2026-04-30) | Column header "SOURCE NAME ▾". ЛКМ = sort, RMB → context menu → toggle "Show Bin Name" / "Show Source Name". Persistent в config. Plugin internally always knows оба имени. См. §13 |
+| **56** | **Simplified `broken` = event-trigger flag** (2026-04-30) | NOT row-aggregate. Любой autoimport-pause event сетит `simplified.broken = true` → red toggle bg. User-initiated recovery (Refresh / mode-toggle / eye flip) clears. См. parked-notes.md |
+| **57** | **Missing = folder-level only** (2026-04-30) | Single-file FS deletion → Premiere native offline-reference UI handles. Plugin не intervenes на file-level. Row stays healthy (case #7). См. §9 |
+| **58** | **Two-step recovery distinction** (2026-04-30) | Axis B: content recovery (Refresh / mode-toggle) ≠ policy recovery (Advanced + manual eye flip). Stored eye=off persists across content paths — только explicit eye flip restores autoimport policy. Mediator-respectful: policy change requires per-row act. См. §16 |
+| **59** | **Herder Bucket DROPPED** (2026-04-30) | Mediator never destructs not-its-own. Side-files в orphan bin сохраняются across FLT toggle / Magnet / Mirror DEL. No "purgatory bucket" needed |
 
 ---
 
@@ -514,12 +562,19 @@ Two-step recovery is explicit when both axes are violated (move + delete content
 
 ## Artifacts (live)
 
-- [sheepdog-state-axes-v1.csv](sheepdog-state-axes-v1.csv) — 3 state + 3 settings + 1 parked plugin axis
-- [sheepdog-state-matrix-v1.csv](sheepdog-state-matrix-v1.csv) — 4 cases S1–S4 + parked S5
-- [sheepdog-state-design-v1.md](sheepdog-state-design-v1.md) — этот doc
-- `figma-sheepdog-states-v1.js` — в работе, design-apprentice handoff
+- [state-axes.csv](state-axes.csv) — 3 state + 3 settings + 1 parked plugin axis (updated 2026-04-30: +sot_parity axis)
+- [state-matrix.csv](state-matrix.csv) — 4 cases S1–S4 + parked S5 (S6 Drifted to be added)
+- [mirror-decisions.csv](mirror-decisions.csv) — 16-case Premiere↔FS violation matrix (en SOT)
+- [mirror-decisions.ru.csv](mirror-decisions.ru.csv) — то же по-русски (тождественная структура)
+- [parked-notes.md](parked-notes.md) — active contracts + design debt + decision history Q1-Q10
+- [state-design.md](state-design.md) — этот doc
+- [../mockups/panel/panel.figma-script.js](../mockups/panel/panel.figma-script.js) — main figma scripter mockup (v2)
 
 ## Artifacts (historical, superseded)
 
-- `sheepdog-state-transitions-v1.excalidraw` + `generate-state-transitions.js` — excalidraw v1, смешивал cause/state. Оставлен в репо для справки, не trust
-- [v1.2 Panel Architecture Concept.md](v1.2 Panel Architecture Concept.md) + [figma-sheepdog-panel-v1.2.js](figma-sheepdog-panel-v1.2.js) — визуал v1.2 использует старое SUB=off-as-subtree-lockout семантику. Новая модель: SUB=off это cause для enabled=no на children. Визуал переиспользуется как шаблон, но семантика state переосмысливается через STATE column
+Перемещены в [../archive/](../archive/) при reorg 2026-04-29:
+
+- `panel-v1-architecture.md` + `panel-v1.figma-script.js` — старая v1 panel concept
+- `panel-v1.2-architecture.md` + `panel-v1.2.figma-script.js` — v1.2 visual использует устаревшую SUB=off-as-subtree-lockout семантику. Новая модель: SUB=off это cause для enabled=no на children
+- `states-experiment.figma-script.js` / `tier-cycle-experiment.figma-script.js` / `cols-experiment.figma-script.js` / `checkbox-variants-experiment.figma-script.js` — experimental WIP концепты, слиты в `mockups/panel/panel.figma-script.js`
+- `table-prototype.html` / `table-prototype.jsx` / `table-prototype.png` — раннее HTML-prototyping, superseded JS scripter mockup
