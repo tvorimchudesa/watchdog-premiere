@@ -6,18 +6,26 @@ definitions of states; (3) behavior across events; (4) recovery tools mapping;
 (8) decision history.
 
 Companion artifacts:
-- [`Decision Matrix - Лист1.csv`](Decision%20Matrix%20-%20Лист1.csv) — working
-  draft с user рассуждениями (русский), 16 cases
-- [`mirror-decisions.csv`](mirror-decisions.csv) — canonical English (нужен
-  sync с финальной матрицей)
-- [`mirror-decisions.ru.csv`](mirror-decisions.ru.csv) — early Russian draft
-  (superseded by Decision Matrix - Лист1.csv)
+- [`mirror-decisions.csv`](mirror-decisions.csv) — canonical English SOT,
+  16-case event matrix, тождественная структура с русской
+- [`mirror-decisions.ru.csv`](mirror-decisions.ru.csv) — то же по-русски,
+  SOT после rename из `Decision Matrix - Лист1.csv` (2026-04-30)
+- [`state-design.md`](state-design.md) — primary spec; см. §"Events" section
+  для полной trigger×consequences модели
 
 ---
 
-## 1 · Formal definitions of states
+## 1 · Formal definitions of states + events
 
-### Drift (Axis A — structure parity)
+**Three-tier model** (см. state-design.md §"Events"):
+- **States** = observable categories (S1-S6 + transient mirror-deleting)
+- **Settings** = mutable preferences (EYE / SUB / LBL — orthogonal к state)
+- **Events** = verbs with triggers + consequences (mutate state / setting / flag / recursive)
+
+Section ниже описывает каждую формально. Drift = state. Autoimport-paused =
+event consequence (NOT state) — оставлен здесь для удобства поиска.
+
+### Drift (Axis A — structure parity, S6 state)
 
 **Definition**: clips для files в tracked FS path **существуют где-либо в
 Premiere project**, но **не в bin для соответствующей row**.
@@ -40,7 +48,12 @@ solvable by Refresh (clips уже в Premiere, dedup blocks new import).
 **Side effect**: Mirror DEL force-disabled для drifted row (§9 structure-lock
 сохраняем).
 
-### Autoimport-paused (Axis B — coverage policy)
+### Autoimport-pause event (Axis B — coverage policy) — NOT a state
+
+**Architectural status**: это **event** (verb), не state. После firing
+mutates `row.eye stored → off` (setting) + `simplified.broken → true` (flag).
+Row state itself stays Healthy. Visual signal — eye-closed glyph (рендер EYE
+setting), не STATE LED.
 
 **Definition**: files в FS существуют, **но clips для них отсутствуют где-либо
 в Premiere**, AND plugin failed honor coverage policy при eye=on.
@@ -261,7 +274,7 @@ combination) — нужны оба тула (Magnet first для structure, Refr
 
 ### 2.8 Eye pause persistence rule
 
-Когда autoimport-paused fires (eye stored → off):
+Когда **autoimport-pause event** fires (mutates eye stored → off; см. state-design.md §"Events" — это event, не state):
 
 | Action | Что recovers | Eye stored value |
 |---|---|---|
@@ -294,8 +307,8 @@ recreate'ит bin в SoT position. Refresh тоже recreate'ит. Orphan bin
 DEL column hidden в Simplified (per #41 spec). Поэтому DEL=on недостижим →
 3-way handshake не складывается → Mirror DEL не fires в Simplified mode.
 
-В Simplified case «delete bin in Premiere with eye=on» = case #2
-(autoimport-paused). НЕ Mirror DEL.
+В Simplified case «delete bin in Premiere with eye=on» = case #2 — fires
+autoimport-pause event (Coverage / Axis B violation). НЕ Mirror DEL.
 
 **Spec**: добавить explicit статement в §9: «Mirror DEL is unavailable in
 Simplified mode (DEL column hidden per #41).»
@@ -373,10 +386,33 @@ Axis B. НЕ recovery для Axis A — структура mode-toggle'ом не
 
 ## 5 · Polish bucket (visual / UX refinements)
 
+### Recovery tool surfacing — per-state button highlight (v1.1+)
+
+**Идея**: button становится визуально выделенной (синий glyph, или ambient
+ring, или иной hint) когда она = recovery tool для текущего violation на
+этом row. Drifted row → 🧲 Magnet хайлайтнут. Autoimport-pause event fired →
+↻ Refresh хайлайтнут. Affordance hint «жми сюда чтобы починить».
+
+**Почему parked в MVP**:
+- Это пятый button state, которого нет в §REF taxonomy (DISABLED / REST /
+  HOVER / PRESSED). Введение требует formal новой tier «RECOMMENDED»
+- `C.accent` цвет конфликтует с Overridden ON в checkbox/eye taxonomy →
+  визуальный двусмыслен
+- LED уже несёт сигнал «что-то не так» — button highlight = redundancy
+- Recovery tool находится через icon legend и mental model — не critical
+  для MVP
+
+**Если делать в v1.1+**:
+- Новый color token (не `C.accent` — например `C.recommend`)
+- Документирование 5-го button state в §REF taxonomy
+- Возможно tooltip-only вариант: hover на recovery button показывает
+  «Recommended for this state» без visual hint
+
 ### Pulse / blink LED при first violation event
 
-При первом violation для row (drift OR autoimport-paused) — короткий pulse
-LED для attention. Не blocking, просто attention attractor.
+При первом violation event для row (drift-detection fires OR autoimport-pause
+fires) — короткий pulse LED (drift) или pulse eye-glyph (pause) для attention.
+Не blocking, просто attention attractor.
 
 ### Side-file info indicator на row
 
@@ -462,46 +498,46 @@ in Simplified одновременно — readable?). Polish-bucket.
 
 ---
 
-## 7 · Implementation guidance — что нужно сделать
+## 7 · Implementation guidance — статус 2026-04-30
 
-### Spec updates (state-design.md)
+### Spec updates (state-design.md) — DONE
 
-1. **§1** — drifted state added (4px solid `accentFill`); Missing
-   clarified как folder-level only; cascade rule
-2. **§9** — Mirror DEL diff-based + safety hierarchy + Simplified-disabled
-   + autocancel mention; countdown ring marked dropped
-3. **§14** — переписан: orphan model + selective FLT (side-files protect
-   subs) + Herder Bucket DROPPED + Magnet expanded scope; Scenarios A-D
-   refactored
-4. **§16** — axiom expanded: eye=timing, DEL=permission, axes A/B
-   independent, asymmetric ambiguity, manifest-as-FS-knowledge
+1. ✓ §"Cause vs State" — drifted state added (S6, 4px solid `accentFill`);
+   Missing clarified как folder-level only; cascade rule
+2. ✓ §"Events" section added — three-tier model formalized (States /
+   Settings / Events). autoimport-pause moved here as event consequence
+3. ✓ §9 Missing — folder-level scope clarified
+4. ✓ §13 Source/Bin Name display toggle — added subsection
+5. ✓ §16 — Mirror DEL diff-based + safety hierarchy + Simplified-disabled +
+   autocancel; State indicators visual updated; Simplified.broken event-trigger
+6. ✓ Decision log #50-#60 added
 
-### CSV sync
+### CSV sync — DONE
 
-5. **mirror-decisions.csv** — sync с финальной русской матрицей (16 cases)
-6. **mirror-decisions.ru.csv** — superseded, либо удалить либо point to
-   Decision Matrix - Лист1.csv
+7. ✓ `mirror-decisions.csv` — synced from Russian SOT, 16 cases, en SOT
+8. ✓ `mirror-decisions.ru.csv` — renamed from `Decision Matrix - Лист1.csv`,
+   тождественная структура. Both CSVs are SOT now.
 
-### JS mockup updates (panel.figma-script.js)
+### JS mockup updates (panel.figma-script.js) — DONE
 
-7. `panelHeader()` / `panelHeaderSimplified()` — column header text:
-   `NAME` → `SOURCE NAME`. Add chevron `▾` для context menu hint.
-8. **§1 demo rows** — добавить drifted state demo row + paused state demo row
-9. **§1 annotation cards** — S5 «Drifted» + S6 «Autoimport-paused» (или
-   объединить в «Mirror desync» card)
-10. **§9 implications** — update текстовку с diff-based DEL + Simplified note
-11. **§11 icon legend** — add Source/Bin Name toggle entry + Magnet
-    expanded scope mention
-12. **§14** — переписать full section: drop Herder Bucket, refactor
-    scenarios, add orphan model
-13. **§REF state taxonomy** — +1 column drifted; autoimport-paused —
-    note as sub-state (not main LED class)
+9. ✓ `panelHeader()` / `panelHeaderSimplified()` / column headers — `NAME` →
+   `SOURCE NAME ▾` (с chevron для context menu hint)
+10. ✓ §1 demo rows — drifted parent+child + autoimport-pause demo row added
+11. ✓ §1 annotation cards — «S6 Drifted» + «Event: autoimport-pause» added
+12. ✓ §9 — diff-based execution + safety hierarchy table (TRUSTED/SUSPICIOUS/BROKEN)
+13. ✓ §11 icon legend — Magnet (Axis A) + Refresh (Axis B) + Source/Bin Name
+    toggle + ⏸ event entry
+14. ✓ §13 — refreshed FS layer crossNote + UX implications (two-axes model +
+    asymmetric ambiguity)
+15. ✓ §14 — Herder Bucket DROPPED, Scenarios A-D refactored, orphan model
+16. ✓ §REF — State taxonomy table (S1-S6 minus autoimport-pause) + new Events
+    taxonomy table (8 events × 5 columns)
 
-### Decision Matrix - Лист1.csv
+### Outstanding (polish bucket)
 
-14. После audit (этот документ) — confirmed final, sync to English.
-15. После sync — может быть renamed `mirror-decisions-discussion.csv` или
-    deleted (decision juzer's).
+- Recovery tool surfacing (button highlight per state) — parked v1.1+, см. §5
+- Per-row pulse animation on first violation event — parked, см. §5
+- Footer tip "unknown import failure — try relaunch premiere" — parked, см. §5
 
 ---
 

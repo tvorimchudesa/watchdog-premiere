@@ -16,7 +16,7 @@
 **Фаза 3a — Transitions diagram (superseded)**: excalidraw версия была сгенерирована, но отвергнута — смешивала **причины** с **состояниями**. Перемещена в archive.
 **Фаза 3b — State-model simplification (done, 2026-04-22)**: модель схлопнута с 11 cases до 4+1. Ключевое решение — разделить **state axes** (3) от **intent settings** (3).
 **Фаза 3c — Mirror architecture (done, 2026-04-30)**: 16-case Premiere↔FS violation matrix → `mirror-decisions.csv`. Two-axes model (drift / paused), Mirror DEL via diff + safety hierarchy, Simplified.broken event-trigger, Source/Bin Name display toggle, +S6 Drifted state. См. §16 + parked-notes.md.
-**Фаза 4 — Visual handoff (in progress)**: figma scripter `mockups/panel/panel.figma-script.js` (v2). Рендерит 4 base states + S6 Drifted + autoimport-paused sub-state с новой колонкой STATE в panel row.
+**Фаза 4 — Visual handoff (in progress)**: figma scripter `mockups/panel/panel.figma-script.js` (v2). Рендерит 5 states (S1-S4 + S6 Drifted) + transient mirror-deleting с новой колонкой STATE в panel row + Events таблица в §REF (autoimport-pause / drift-detection / Mirror DEL diff tiers / dedup-rejected / ghost-row / FS file gone).
 
 ---
 
@@ -39,6 +39,39 @@ Priority order (при конфликте выигрывает low rank):
 - **SUB** — recursion control (не state own row, но cascade = cause для `enabled=no` детей)
 - **LBL** — label text/color
 
+### Events (verbs that mutate state / settings / flags) — added 2026-04-30
+
+States и Settings — это **observable categories** (что row показывает в данный момент). **Events** — это **verbs**, которые firят под определёнными trigger conditions и имеют consequences:
+- mutate state (Healthy → Drifted)
+- mutate setting (eye stored → off)
+- mutate mode-level flag (simplified.broken → true)
+- recursive — fire другой event (BROKEN diff → fires autoimport-pause)
+- nothing — silent (cosmetic actions: clip rename, side-file added, eye=off baseline FS event)
+
+#### Plugin-side internal events
+
+| event | trigger | mutates state? | mutates setting? | mutates flag? |
+|---|---|---|---|---|
+| **autoimport-pause** | Coverage violation (Axis B) — bin/file deleted with eye=on (Mirror DEL not aligned) / cancel mid-import / non-dedup import failure | no (row stays Healthy) | row.eye stored → off | simplified.broken → true |
+| **drift-detection** | Structure parity violation (Axis A) — bin moved with clips / file dragged to wrong bin / dedup-rejected re-import | row.sot_parity → drifted (cascade up to root) | no | no |
+| **Mirror DEL fires** (TRUSTED) | 3-way handshake aligned + diff TRUSTED | row → mirror-deleting (transient) → gone | DEL stays on (auto-untick on cancel) | no |
+| **Mirror DEL diff = SUSPICIOUS** | 3-way handshake aligned + diff suspicious | no (import wins instead) | manifest enriched | no |
+| **Mirror DEL diff = BROKEN** | 3-way handshake aligned + diff incoherent | no | recursive → fires autoimport-pause | (recursive) |
+| **dedup-rejected** | autoimport tries to add clip but it already exists в Premiere в чужом bin | recursive → fires drift-detection | manifest enriched (rejected entry tracked) | no |
+| **ghost-row created** | Relink to new path while old path FS-physically alive | new row created (auto force-disable, blacklist) | no | no |
+
+#### User-driven events
+
+Click events — toggle EYE/SUB/REL/SEQ/FLT, click ×, click ←, click 🧲 Magnet, click ↻ Refresh, click ⌕ Relink, drag-sort, mode-toggle Adv↔Simplified, eye flip recovery. Все mutate stored values + могут fire chain events (Magnet → drift-detection re-evaluates → state change).
+
+#### Filesystem events
+
+File/folder created/deleted/moved/renamed — observed by watcher. Per asymmetric ambiguity axiom (§16) FS-side destruction всегда → Missing (folder-level). FS-side creation → autoimport (subject к eye state).
+
+#### Connection to matrices
+
+[mirror-decisions.csv](mirror-decisions.csv) — это event-table: 16 кейсов = 16 events × (trigger conditions, consequences, recovery paths). State-таблица + matrix вместе дают full picture: state определяет «где row сейчас», matrix описывает «какие events меняют where row goes next».
+
 ### 5 states (+ 1 parked)
 
 | id | state | cause | indicator |
@@ -50,7 +83,7 @@ Priority order (при конфликте выигрывает low rank):
 | S5 | Plugin Unhealthy (parked v1.1+) | Premiere recovery block etc. | global panel indicator |
 | S6 | **Drifted** | Premiere bin tree ≠ FS folder layout (clips moved out of place / dedup'd to wrong bin) — см. §16 Axis A | 4px solid accentFill (dark blue), cascade up to root |
 
-**Sub-state of Healthy**: `autoimport-paused` — eye stored=off after autoimport-pause event (Axis B violation, см. §16). Row остаётся `healthy`, signal через eye-closed glyph + Simplified red toggle bg.
+**NOT a state**: «autoimport-paused» — это **event consequence**, не state. После firing autoimport-pause event row.eye mutates → off (setting), simplified.broken → true (flag). Row state остаётся Healthy. Visual signal — eye-closed glyph (рендер EYE setting), не STATE LED. Cм. секцию Events выше.
 
 ---
 
@@ -399,7 +432,7 @@ Mirror DEL fires per Premiere bin-delete event under 3-way handshake. Execution 
 |---|---|---|
 | **TRUSTED** | diff matches expected pattern (clean delete of bin / file via right-click) | proceed → OS trash with 5s cancellable timer |
 | **SUSPICIOUS** | manifest stale / diff has unexpected gaps / dedup-injected clips elsewhere | **import wins** — autoimport re-imports instead of trashing. Better over-represent than nuke files юзер не хотел удалять |
-| **BROKEN** | session corrupted / manifest incoherent | abort destructive path → fall through to Coverage violation (Axis B → autoimport-paused) |
+| **BROKEN** | session corrupted / manifest incoherent | abort destructive path → recursive event firing: autoimport-pause fires (Axis B consequences apply) |
 
 **Cancellation**: 5s timer окно visible только в progress panel (countdown ring on DEL cell — PARKED visual). Cancel = un-tick DEL checkbox automatically + autoimport stops; next FS event triggers Axis B. См. [parked-notes.md](parked-notes.md) §"Active contracts: DEL diff hierarchy" для full spec.
 
@@ -445,11 +478,11 @@ Two-step recovery is explicit when both axes violated (move WITH clips + delete 
 
 **State indicators:**
 - Axis A violated → row state = `drifted` — **4px solid `accentFill` (dark blue), cascade up to root**. Distinct visual от Missing's red 4px solid (different colors, same weight). Same indicator в Simplified и Advanced (drift = local issue, не affects mode globally).
-- Axis B violated → row's eye stored → off (visual: eye-closed glyph per-row); row state stays `healthy + autoimport-paused` (sub-state — FS unchanged, no truth violation). **Simplified layer**: any autoimport-pause event triggers `simplified.broken = true` flag → red Simplified toggle background until user-initiated recovery clears flag. Event-trigger contract (fires on ANY row's pause, not aggregated per-row). См. [parked-notes.md](parked-notes.md) §"Active contracts".
+- Axis B violated → fires **autoimport-pause event** (см. Events section): mutates `row.eye stored → off` (visual: eye-closed glyph per-row) + sets `simplified.broken = true` mode flag (visual в Simplified: red toggle background). Row state itself stays `healthy` — no FS/enabled/busy/sot_parity change. Event-trigger contract: fires on ANY row's pause, not aggregated per-row; flag clears on user-initiated recovery. См. [parked-notes.md](parked-notes.md) §"Active contracts".
 
 **Eye=off + Premiere-side delete** = `healthy`, do nothing. No autoimport policy was active → no policy to violate (case #1).
 
-**Eye=on + DEL=on + master=on + Premiere-side delete** = Mirror DEL flow → row removed (not Missing — see Asymmetric Ambiguity row). Diff categorization may downgrade к autoimport-paused if SUSPICIOUS/BROKEN.
+**Eye=on + DEL=on + master=on + Premiere-side delete** = Mirror DEL flow → row removed (not Missing — see Asymmetric Ambiguity row). Diff categorization may degrade: SUSPICIOUS → import wins (no destruction); BROKEN → recursive event firing — autoimport-pause fires instead.
 
 ---
 
@@ -509,13 +542,14 @@ Two-step recovery is explicit when both axes violated (move WITH clips + delete 
 | **50** | **Two-axes violation model** (2026-04-30) | Premiere-side change without Mirror DEL alignment violates one of 2 orthogonal SoT axes: **A — Structure parity** (drift, clips misplaced) recovered via Magnet; **B — Content coverage** (paused, files in FS without clips + plugin failure) recovered via Refresh / mode-toggle / eye flip. Non-overlapping recovery tools. См. §16 |
 | **51** | **Drifted = new state** (2026-04-30) | S6. Visual: 4px solid `accentFill` (dark blue), cascade up to root. Distinct from Missing red 4px. Same indicator в Simplified и Advanced (drift = local issue) |
 | **52** | **Empty bin moved = NOT drift** (2026-04-30) | Case #4'. Empty bin без clips → orphan instantly, recreate в SoT position при следующем FS-event. Нет drift signal because nothing misplaced (import triggers files, не folders) |
-| **53** | **Mirror DEL = MVP via diff + safety hierarchy** (2026-04-30) | Не parked. 3-way handshake gates entry; diff between pre-delete manifest и post-delete bin contents categorizes: TRUSTED → trash, SUSPICIOUS → import wins, BROKEN → autoimport-paused. См. §16 |
+| **53** | **Mirror DEL = MVP via diff + safety hierarchy** (2026-04-30) | Не parked. 3-way handshake gates entry; diff between pre-delete manifest и post-delete bin contents categorizes: TRUSTED → trash, SUSPICIOUS → import wins, BROKEN → recursive autoimport-pause event fires. См. §16 |
 | **54** | **Bin label rename = silent healthy** (2026-04-30) | Case #12. Premiere bin label = display attribute, mapping через internal bin ID. Custom labeling allowed без drift triggering |
 | **55** | **Source / Bin Name display toggle** (2026-04-30) | Column header "SOURCE NAME ▾". ЛКМ = sort, RMB → context menu → toggle "Show Bin Name" / "Show Source Name". Persistent в config. Plugin internally always knows оба имени. См. §13 |
 | **56** | **Simplified `broken` = event-trigger flag** (2026-04-30) | NOT row-aggregate. Любой autoimport-pause event сетит `simplified.broken = true` → red toggle bg. User-initiated recovery (Refresh / mode-toggle / eye flip) clears. См. parked-notes.md |
 | **57** | **Missing = folder-level only** (2026-04-30) | Single-file FS deletion → Premiere native offline-reference UI handles. Plugin не intervenes на file-level. Row stays healthy (case #7). См. §9 |
 | **58** | **Two-step recovery distinction** (2026-04-30) | Axis B: content recovery (Refresh / mode-toggle) ≠ policy recovery (Advanced + manual eye flip). Stored eye=off persists across content paths — только explicit eye flip restores autoimport policy. Mediator-respectful: policy change requires per-row act. См. §16 |
 | **59** | **Herder Bucket DROPPED** (2026-04-30) | Mediator never destructs not-its-own. Side-files в orphan bin сохраняются across FLT toggle / Magnet / Mirror DEL. No "purgatory bucket" needed |
+| **60** | **Events orthogonal to States/Settings** (2026-04-30) | Three-tier model: States (observable categories: S1-S6) / Settings (mutable preferences: EYE/SUB/LBL) / **Events** (verbs that mutate state/settings/flags). autoimport-pause = event (NOT state) — mutates row.eye stored=off + simplified.broken=true; row state stays Healthy. mirror-decisions.csv = event-table (16 events × consequences). См. Events section after Settings axes |
 
 ---
 

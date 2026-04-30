@@ -6,15 +6,31 @@ is the **visual realization** of these specs — when they conflict, this folder
 
 ## Files
 
-- **`state-design.md`** — primary spec. Covers the 4-state model
-  (Healthy / Busy / Disabled / Missing), tier cycle, FLT cascade, Mirror DEL
-  flow, plugin boundary, and the §1-§16 numbered decision references used
-  throughout the panel mockup.
+### Spec (markdown)
+
+- **`state-design.md`** — primary spec. Three-tier model: **States** (S1–S6
+  observable categories) / **Settings** (EYE/SUB/LBL orthogonal) / **Events**
+  (verbs that mutate state/settings/flags). Covers tier cycle, FLT cascade,
+  Mirror DEL diff-based flow + safety hierarchy, plugin boundary,
+  asymmetric ambiguity axiom, and the §1–§16 numbered decision references
+  used throughout the panel mockup.
+- **`parked-notes.md`** — active contracts + design debt + decision history.
+  Holds the contracts that ride on top of the spec but aren't formal axes
+  (e.g. eye pause persistence, Source/Bin Name toggle, mirror DEL diff
+  hierarchy implementation). Also tracks polish-bucket items deferred
+  to v1.1+.
+
+### Data tables (CSV)
+
 - **`state-axes.csv`** — orthogonal axes that compose into row state
-  (state-indicator × user-intent × FS-reachability). Used to verify the model
-  is complete.
+  (path × enabled × busy × sot_parity). Used to verify the model is complete.
 - **`state-matrix.csv`** — full (axis × axis) outcome matrix. Ground truth
   for which combinations the panel supports + how each renders.
+- **`mirror-decisions.csv`** — 16-case Premiere↔FS violation matrix
+  (en SOT). Each row = one event with trigger conditions + consequences +
+  recovery paths in both Advanced and Simplified modes. This is essentially
+  an event-table — see state-design.md §"Events" section.
+- **`mirror-decisions.ru.csv`** — то же по-русски (тождественная структура).
 
 ## Versioning
 

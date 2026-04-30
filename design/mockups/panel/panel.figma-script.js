@@ -1072,9 +1072,9 @@ async function main() {
     wrap.counterAxisAlignItems = "CENTER";
     setFill(wrap, C.panelAlt, 1);
 
-    wrap.appendChild(colHeaderCell(COL.STATE, "ST",     "CENTER"));
-    wrap.appendChild(colHeaderCell(COL.NAME,  "NAME",   "MIN", C.textDim));
-    wrap.appendChild(colHeaderCell(COL.PATH,  "PATH",   "MIN"));
+    wrap.appendChild(colHeaderCell(COL.STATE, "ST",            "CENTER"));
+    wrap.appendChild(colHeaderCell(COL.NAME,  "SOURCE NAME ▾", "MIN", C.textDim));
+    wrap.appendChild(colHeaderCell(COL.PATH,  "PATH",          "MIN"));
     // Flex spacer — absorbs slack between PATH and right-pinned cluster
     // (SUB onward), pushing cluster to the right edge per Mockup.png target.
     const headerFlex = spacer(1, 1);
@@ -1095,16 +1095,17 @@ async function main() {
   }
 
   // stateCell(stateIndicator) — LED indicator per row.
-  // Palette (2026-04-25 — mirror-deleting added):
-  //   healthy         = solid  4px blue   (idle baseline)
-  //   busy            = hollow 6px blue   (import in-flight, pulses in real impl)
-  //   mirror-deleting = hollow 6px red    (OS trash in-flight, pulses; parallels busy in red channel)
-  //   disabled        = hollow 6px gray   (off, not broken)
-  //   missing         = solid  4px red    (persistent alarm — path unreachable)
+  // Palette (2026-04-30 — drifted added; per spec §16 Axis A — clips misplaced):
+  //   healthy         = solid  4px blue (C.accent)        — idle baseline
+  //   busy            = hollow 6px blue (C.accent)        — import in-flight, pulses in real impl
+  //   mirror-deleting = hollow 6px red (C.danger)         — OS trash in-flight; red analogue of busy
+  //   drifted         = solid  4px dark blue (TC.accentFill) — Premiere bin tree ≠ FS layout (Axis A); cascade up to root
+  //   disabled        = hollow 6px gray (C.strokeMid)     — off, not broken
+  //   missing         = solid  4px red (C.danger)         — folder-level path unreachable (persistent alarm)
   //
   // Shape × hue grammar:
-  //   solid/hollow encodes steady/transient; hue (blue/red/gray) encodes channel.
-  //   mirror-deleting is the red analogue of busy — same visual weight, opposite outcome.
+  //   solid/hollow encodes steady/transient; hue (blue/red/gray/dark-blue) encodes channel.
+  //   drifted: solid=steady (not transient), dark-blue=structural channel (not alarm-red).
   function stateCell(stateIndicator) {
     const f = figma.createFrame();
     f.resize(COL.STATE, ROW_H);
@@ -1127,6 +1128,9 @@ async function main() {
       led.resize(6, 6); led.cornerRadius = 3;
       led.fills = [];
       setStroke(led, C.danger, 1, 1);
+    } else if (stateIndicator === "drifted") {
+      led.resize(4, 4); led.cornerRadius = 2;
+      setFill(led, TC.accentFill, 1);
     } else if (stateIndicator === "disabled") {
       led.resize(6, 6); led.cornerRadius = 3;
       led.fills = [];
@@ -1332,7 +1336,7 @@ async function main() {
     setFill(wrap, C.panelAlt, 1);
 
     wrap.appendChild(colHeaderCell(COL.STATE,    "ST",    "CENTER"));
-    wrap.appendChild(colHeaderCell(COL_SIMP_NAME, "NAME",  "MIN", C.textDim));
+    wrap.appendChild(colHeaderCell(COL_SIMP_NAME, "SOURCE NAME ▾",  "MIN", C.textDim));
     // Flex spacer — pushes right-pinned cluster (LNK · LBL · ×) to the right
     // edge, mirroring Advanced columnHeaderBar.
     const headerFlexS = spacer(1, 1);
@@ -1732,6 +1736,45 @@ async function main() {
         { glyph: "🧲", color: C.strokeMid },
       ],
     },
+    // ── S6 DRIFTED — Axis A violation (clips misplaced; cascade up to root) ─
+    // Per spec §16 + mirror-decisions case #4 (bin moved with clips out of parent).
+    // LED = solid 4px dark blue (TC.accentFill). Recovery tool: 🧲 Magnet (see §11/§REF).
+    {
+      tree: "expanded", stateIndicator: "drifted",
+      name: "client_brief", path: "E:/Projects/2026/FILM/client_brief",
+      sub: "on", rel: "off", seq: "off", flt: "off", eye: "on",
+      label: C.labelForest,
+      actions: [
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
+      ],
+    },
+    {
+      indent: 18, tree: "collapsed", stateIndicator: "drifted",
+      name: "interviews", path: "…/client_brief/interviews",
+      sub: "inherited-on", rel: "inherited-off", seq: "inherited-off", flt: "inherited-off", eye: "inherited-on",
+      label: null, labelInherited: true,
+      actions: [
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
+      ],
+    },
+    // ── HEALTHY + autoimport-pause event fired — Axis B violation (eye stored=off) ─
+    // Per spec §16 + mirror-decisions case #2/#11.new. Row stays healthy (FS unchanged),
+    // eye-closed glyph per-row signals pause. Recovery tool: ↻ Refresh (see §11/§REF).
+    {
+      tree: "collapsed", stateIndicator: "healthy",
+      name: "stock_lib", path: "E:/Stock/2026/library",
+      sub: "on", rel: "off", seq: "off", flt: "off", eye: "off",
+      label: null, labelInherited: true,
+      actions: [
+        { glyph: "↻", color: C.borderBright },
+        { glyph: "⌕", color: C.borderBright },
+        { glyph: "🧲", color: C.borderBright },
+      ],
+    },
     // ── EDGE — Missing AND user-disabled ────────────────────────────────
     {
       tree: "collapsed", stateIndicator: "missing",
@@ -1751,7 +1794,7 @@ async function main() {
     panel1.appendChild(row(cfg));
     panel1.appendChild(divider(PANEL_W, C.border, 0.25));
   }
-  panel1.appendChild(footer("Watching 12 rows  ·  1 busy  ·  4 missing  ·  4 disabled  ·  1 edge (missing + user-disabled)"));
+  panel1.appendChild(footer("Watching 15 rows  ·  1 busy  ·  4 missing  ·  4 disabled  ·  2 drifted  ·  1 with autoimport-pause event fired  ·  1 edge"));
   sec1Row.appendChild(panel1);
 
   // ---------- Annotation column — 8 cards ----------
@@ -1883,6 +1926,98 @@ async function main() {
       })()),
       title: "Edge — Missing AND user-disabled",
       desc: "Row was force-disabled by × and path is ALSO offline. Two independent axes visible: LED red (path), name dim (user intent). Restore path → LED hollow dim (disabled, not missing). To reactivate: fix path AND × (restore).",
+    },
+  ]));
+
+  ann1.appendChild(annCard("S6 — Drifted (Axis A — clips misplaced)", TC.accentFill, [
+    {
+      demo: demoBox(32, 20, (function() {
+        const led = figma.createFrame();
+        led.resize(4, 4); led.cornerRadius = 2;
+        setFill(led, TC.accentFill, 1);
+        return led;
+      })()),
+      title: "Solid 4px dark blue — same weight as healthy/missing, structural channel",
+      desc: "Drift = clips for tracked FS files are NOT in the bin for the corresponding row. Triggered by: bin moved with clips out of parent (case #4), file dragged to wrong bin (case #5), dedup-rejected re-import (case #11 — clips already exist in wrong bins). LED weight matches healthy/missing (4px solid) — drift is a steady SoT mismatch, not transient. Hue is dark blue (TC.accentFill) — distinct from healthy bright blue (alive) and missing red (alarm).",
+    },
+    {
+      demo: demoBox(32, 20, (function() {
+        const g = vHug(); g.itemSpacing = 4;
+        const r1 = hHug(); r1.itemSpacing = 4; r1.counterAxisAlignItems = "CENTER";
+        const led1 = figma.createFrame(); led1.resize(4,4); led1.cornerRadius = 2; setFill(led1, TC.accentFill, 1);
+        r1.appendChild(led1);
+        r1.appendChild(txt("parent", F.m, 9, C.borderBright));
+        const r2 = hHug(); r2.itemSpacing = 4; r2.counterAxisAlignItems = "CENTER";
+        r2.appendChild(spacer(8, 1));
+        const led2 = figma.createFrame(); led2.resize(4,4); led2.cornerRadius = 2; setFill(led2, TC.accentFill, 1);
+        r2.appendChild(led2);
+        r2.appendChild(txt("child (origin)", F.m, 9, C.strokeMid));
+        g.appendChild(r1); g.appendChild(r2);
+        return g;
+      })()),
+      title: "Cascade up to root — parent shows drift if any descendant drifted",
+      desc: "If a child's clips are misplaced, the LED propagates up the tree to the root. Single visual signal at panel scan: \"something drifted in this subtree\". Expand to find origin. No double-counting: drift is a row's own state, but visibility cascades for navigability.",
+    },
+    {
+      demo: demoBox(32, 20, actionIcon("🧲", C.borderBright)),
+      title: "Magnet (🧲) is the recovery tool — Axis A only",
+      desc: "Magnet pulls scattered clips back to the SoT bin position (recreates the bin if it was moved with clips, then collects siblings into it). Doesn't re-import content beyond restoring structure. After Magnet → row → healthy. Side-files preserved (mediator never destructs not-its-own — Herder Bucket DROPPED). MVP: button stays in REST tier — recovery tool surfacing (button highlight per state) is polish v1.1+.",
+    },
+    {
+      demo: demoBox(32, 20, (function() {
+        const g = vHug(); g.itemSpacing = 2;
+        g.appendChild(txt("✓ bin moved w/ clips", F.m, 9, flat(C.borderBright, 0.85)));
+        g.appendChild(txt("✓ file → wrong bin", F.m, 9, flat(C.borderBright, 0.85)));
+        g.appendChild(txt("✓ dedup-rejected", F.m, 9, flat(C.borderBright, 0.85)));
+        g.appendChild(txt("× empty bin moved", F.m, 9, flat(C.strokeMid, 0.85)));
+        g.appendChild(txt("× bin label rename", F.m, 9, flat(C.strokeMid, 0.85)));
+        return g;
+      })()),
+      title: "What is / isn't drift",
+      desc: "Drift requires misplaced CLIPS. Empty moved bin = no drift (case #4', nothing to misplace; orphan + recreate on next FS event). Bin label rename = no drift (case #12, mapping via internal ID — labels are display attribute). Premiere clip rename = no drift (case #5.1, cosmetic).",
+    },
+  ]));
+
+  ann1.appendChild(annCard("Event: autoimport-pause (Axis B trigger)", C.borderBright, [
+    {
+      demo: demoBox(32, 20, (function() {
+        const g = hHug(); g.itemSpacing = 4; g.counterAxisAlignItems = "CENTER";
+        g.appendChild(txt("→", F.b, 12, C.textDim));
+        const led = figma.createFrame(); led.resize(4,4); led.cornerRadius = 2; setFill(led, C.accent, 1);
+        g.appendChild(led);
+        g.appendChild(eyeToggle("off"));
+        return g;
+      })()),
+      title: "Event, NOT state — row state stays Healthy",
+      desc: "autoimport-pause is an EVENT (verb), not a state. After firing it MUTATES: row.eye stored → off (setting), simplified.broken → true (mode flag). Row state itself remains Healthy — no FS/enabled/busy/sot_parity change. Visual signal is the eye-closed glyph (rendering of EYE setting), NOT a STATE LED change. Visually indistinguishable from manual eye=off (case #9) at row-level — the distinction lives in CAUSE (auto-flip vs user-act), not observable.",
+    },
+    {
+      demo: demoBox(32, 20, (function() {
+        const g = vHug(); g.itemSpacing = 2;
+        g.appendChild(txt("event fires when:", F.s, 8, C.textDim));
+        g.appendChild(txt("• bin/file deleted (eye=on)", F.m, 9, flat(C.borderBright, 0.85)));
+        g.appendChild(txt("• cancel mid-import", F.m, 9, flat(C.borderBright, 0.85)));
+        g.appendChild(txt("• non-dedup import failure", F.m, 9, flat(C.borderBright, 0.85)));
+        g.appendChild(txt("• Mirror DEL diff = BROKEN", F.m, 9, flat(C.borderBright, 0.85)));
+        return g;
+      })()),
+      title: "Trigger conditions — Coverage contract violated",
+      desc: "Plugin promised \"every FS file represented as clip in right bin while autoimport=on\". When that contract can't be maintained, the autoimport-pause event fires to prevent retry-loops. Recursive: Mirror DEL BROKEN diff fires this event too. See §REF Events table for full event taxonomy.",
+    },
+    {
+      demo: demoBox(32, 20, actionIcon("↻", C.borderBright)),
+      title: "Refresh (↻) reverses event consequences — Axis B only",
+      desc: "Recovery tools clear event consequences. Two-step distinction: content recovery (Refresh / mode-toggle Adv↔Simplified) re-imports current FS state — stored eye=off PERSISTS. Policy recovery (Advanced + manual eye flip on) resumes future autoimport. Stored eye=off persists across content-only paths. After (a)/(b) without (c), next FS event re-fires autoimport-pause. MVP: button stays in REST tier — recovery tool surfacing (button highlight per state) is polish v1.1+.",
+    },
+    {
+      demo: demoBox(32, 20, (function() {
+        const f = figma.createFrame();
+        f.resize(28, 14); f.cornerRadius = 7;
+        setFill(f, C.danger, 0.6);
+        return f;
+      })()),
+      title: "simplified.broken flag — mode-level consequence",
+      desc: "Per autoimport-pause firing, simplified.broken flag sets to true → in Simplified mode the Advanced toggle bg renders red until user-initiated recovery clears the flag. Event-trigger contract: flag fires on ANY row's pause-event, not aggregated per-row. In Advanced view, the flag has no visual — eye-closed glyph per-row carries the signal. Mode-global signal lives only in Simplified header.",
     },
   ]));
 
@@ -3333,8 +3468,8 @@ async function main() {
   const sec9 = vSec(contentW);
   sec9.itemSpacing = 16;
   sec9.appendChild(sectionTitle(
-    "§9 — Mirror DEL · permission + Premiere-triggered OS trash (revised 2026-04-25)",
-    "DEL column is a PERMISSION, not a commit toggle. Files go to OS trash ONLY when user deletes bin/file inside Premiere's import pool AND row DEL=on AND global Mirror DEL enabled. Timer + Cancel, mirror-deleting state LED (hollow red), row disappears on confirmed OS delete. Structure-lock disables DEL if bin tree diverges from SoT.",
+    "§9 — Mirror DEL · permission + diff-based execution (revised 2026-04-30)",
+    "DEL column is a PERMISSION, not a commit toggle. OS trash fires ONLY when user deletes bin/file inside Premiere's import pool AND row DEL=on AND global Mirror DEL=on (3-way handshake). Execution is diff-based with safety hierarchy: TRUSTED → trash, SUSPICIOUS → import wins, BROKEN → recursive autoimport-pause event fires. Timer + Cancel, mirror-deleting state LED (hollow red), row disappears on confirmed OS delete. Structure-lock disables DEL if bin tree diverges from SoT. Always hidden in Simplified mode (#41).",
     contentW
   ));
 
@@ -3364,6 +3499,73 @@ async function main() {
     F.r, 11, C.textDim, contentW - 40, 16
   ));
   sec9.appendChild(mdRule);
+
+  // ---- Diff-based execution + safety hierarchy ----
+  const mdDiff = vSec(contentW);
+  mdDiff.cornerRadius = 8;
+  setFill(mdDiff, C.panel, 1);
+  setStroke(mdDiff, TC.accentFill, 0.5, 1);
+  mdDiff.paddingTop = 16; mdDiff.paddingBottom = 16;
+  mdDiff.paddingLeft = 20; mdDiff.paddingRight = 20;
+  mdDiff.itemSpacing = 10;
+  const mdDiffHead = hHug();
+  mdDiffHead.itemSpacing = 10;
+  mdDiffHead.counterAxisAlignItems = "CENTER";
+  const mdDiffDot = figma.createFrame();
+  mdDiffDot.resize(6, 6); mdDiffDot.cornerRadius = 3;
+  setFill(mdDiffDot, TC.accentFill, 1);
+  mdDiffHead.appendChild(mdDiffDot);
+  mdDiffHead.appendChild(txt("Diff-based execution + safety hierarchy", F.s, 12, C.white, undefined, 0.5));
+  mdDiff.appendChild(mdDiffHead);
+  mdDiff.appendChild(txtW(
+    "3-way handshake covers user intent on Premiere side, but not diff coherence. Plugin computes a diff between two snapshots: pre-delete manifest (full FS knowledge incl. dedup-rejected entries) vs post-delete Premiere bin contents. Diff is categorized into one of three tiers — only TRUSTED proceeds to OS trash.",
+    F.r, 11, C.textDim, contentW - 40, 16
+  ));
+
+  function mdTier(tag, tagColor, condition, action) {
+    const tr = hSec(contentW - 40);
+    tr.itemSpacing = 12;
+    tr.counterAxisAlignItems = "MIN";
+    tr.paddingTop = 4; tr.paddingBottom = 4;
+    const tagBox = cell(120, null);
+    tagBox.resize(120, 18);
+    const tagInner = hHug();
+    tagInner.itemSpacing = 6;
+    tagInner.counterAxisAlignItems = "CENTER";
+    tagInner.paddingTop = 2; tagInner.paddingBottom = 2;
+    tagInner.paddingLeft = 8; tagInner.paddingRight = 8;
+    tagInner.cornerRadius = 4;
+    setFill(tagInner, tagColor, 0.18);
+    setStroke(tagInner, tagColor, 0.55, 1);
+    tagInner.appendChild(txt(tag, F.b, 10, tagColor, undefined, 0.5));
+    tagBox.appendChild(tagInner);
+    tr.appendChild(tagBox);
+    tr.appendChild(txtW(condition, F.r, 11, C.borderBright, 280, 16));
+    tr.appendChild(txt("→", F.r, 12, C.textDim));
+    tr.appendChild(txtW(action, F.m, 11, C.borderBright, contentW - 40 - 120 - 280 - 32 - 36, 16));
+    return tr;
+  }
+  mdDiff.appendChild(mdTier(
+    "TRUSTED", C.accent,
+    "diff matches expected pattern (clean delete of bin / file via right-click)",
+    "proceed → OS trash with 5s cancellable timer"
+  ));
+  mdDiff.appendChild(mdTier(
+    "SUSPICIOUS", C.amber,
+    "manifest stale / diff has unexpected gaps / dedup-injected clips elsewhere",
+    "import wins — autoimport re-imports instead of trashing (better over-represent than nuke wrong files)"
+  ));
+  mdDiff.appendChild(mdTier(
+    "BROKEN", C.danger,
+    "session corrupted / manifest incoherent",
+    "abort destructive path → recursive event firing: autoimport-pause fires (Axis B consequences)"
+  ));
+  mdDiff.appendChild(spacer(1, 4));
+  mdDiff.appendChild(txtW(
+    "Asymmetric ambiguity axiom applies recursively: when even Premiere-side intent becomes ambiguous (broken state), default to non-destructive path. Cancellation: 5s timer window visible only in progress panel (countdown ring on DEL cell — PARKED visual).",
+    F.r, 11, C.textDim, contentW - 40, 16
+  ));
+  sec9.appendChild(mdDiff);
 
   // ---- Flow: Premiere delete → timer → OS trash ----
   const mdFlow = vSec(contentW);
@@ -3758,12 +3960,12 @@ async function main() {
   const iconRow1 = hSec(contentW);
   iconRow1.itemSpacing = 16;
   iconRow1.counterAxisAlignItems = "MIN";
-  iconRow1.appendChild(iconLegend("↻", "Manual Sync",
-    "Re-scan this folder only, import new files. Works regardless of Auto-import global."));
+  iconRow1.appendChild(iconLegend("↻", "Refresh — Axis B recovery (paused)",
+    "Re-scans this folder, re-imports current FS state. Recovery tool for Axis B (Content coverage — files in FS without clips + plugin failure). Two-step recovery: content recovery (Refresh / mode-toggle) ≠ policy recovery (Advanced + manual eye flip). Stored eye=off persists across Refresh — only manual eye flip restores future autoimport policy. MVP: button stays in REST tier on all rows; per-state button highlight is polish v1.1+."));
   iconRow1.appendChild(iconLegend("⌕", "Relink",
     "Pick a new path for this row. After a relink the row becomes a ROOT (nearest parent in tree is effectively dropped). If OS later re-establishes parent-child via FS moves, SheepDog re-parents automatically (OS is SoT). Blocked targets: live parent/child of this row, dead (missing) row, self."));
-  iconRow1.appendChild(iconLegend("🧲", "Magnet — restore SoT parity",
-    "Pulls scattered bins/files back to their tracked positions. Side-files preserved (duplicate-not-destroy); orphans land in Herder Bucket. Full semantics in §14."));
+  iconRow1.appendChild(iconLegend("🧲", "Magnet — Axis A recovery (drift)",
+    "Recovery tool for Axis A (Structure parity / drift — clips misplaced). Pulls scattered clips into the recreated SoT bin position; recreates bin if it was moved with clips. Doesn't re-import content beyond restoring structure (Refresh handles Axis B). Side-files preserved — mediator never destructs not-its-own (Herder Bucket DROPPED 2026-04-30). MVP: button stays in REST tier on all rows; per-state highlight is polish v1.1+. Full semantics in §14."));
   sec11.appendChild(iconRow1);
 
   const iconRow2 = hSec(contentW);
@@ -3776,6 +3978,18 @@ async function main() {
   iconRow2.appendChild(iconLegend("←", "Row action — restore disabled row (soft-stop reverse)",
     "Only appears on disabled rows (glyph context-switch in RM column). Diamond form-factor matches × geometrically — same visual weight, opposite intent. Hover turns BLUE (accent) as the positive-restore mirror of × → red on destructive. Click resumes watching: stored settings re-applied, soft-stop lifted (existing imports were legitimate, new ones now flow again)."));
   sec11.appendChild(iconRow2);
+
+  // Column header gestures — Source/Bin Name display toggle (#55)
+  const iconRow3 = hSec(contentW);
+  iconRow3.itemSpacing = 16;
+  iconRow3.counterAxisAlignItems = "MIN";
+  iconRow3.appendChild(iconLegend("▾", "Column header — Source / Bin Name toggle",
+    "Column header reads \"SOURCE NAME ▾\". ЛКМ (LMB) = sort by current display mode (standard). RMB → context menu → toggle \"Show Bin Name\" / \"Show Source Name\". Persistent in config, switches display on ALL rows. Mapping invariant: row binding goes through Premiere internal bin ID, not the label — custom rename in Premiere = silent healthy (case #12), no drift triggering. Plugin internally always knows both names."));
+  iconRow3.appendChild(iconLegend("⌕", "Relink (in LNK column — Simplified always-visible)",
+    "Same as #2 above — explicitly noting that ⌕ has its own dedicated LNK column in both modes (#42). Color follows row state (borderBright on healthy/active, strokeMid on disabled/missing/busy) — never red. Click = relink flow. After relink the row becomes a ROOT (nearest tracked parent dropped); OS-side moves later re-parent automatically."));
+  iconRow3.appendChild(iconLegend("⏸", "Event: autoimport-pause (Axis B trigger)",
+    "Not a row icon, not a state — an EVENT (verb) that fires when Coverage contract violates. Mutates row.eye stored → off (setting) + simplified.broken → true (mode flag). Row state stays Healthy. Visual: eye-closed glyph per-row (EYE setting render) + red Simplified toggle bg (mode-level flag). Recovery: Refresh (content) ≠ manual eye flip (policy). See §1 \"Event: autoimport-pause\" annotation card + §REF Events table."));
+  sec11.appendChild(iconRow3);
   root.appendChild(sec11);
 
   // ==================================================
@@ -4560,7 +4774,7 @@ async function main() {
       "Move files — user or Finder/CLI",
       "Modify file contents — never",
     ],
-    "Mirror DEL (per §9 — revised 2026-04-25): the ONLY way SheepDog touches OS. Permission model, not commit model. Fires iff: (A) user deletes bin/file INSIDE Premiere from a tracked path, (B) row DEL=on, (C) global Mirror DEL master switch ON (default off per #45). Timer + Cancel like Import. Plugin Explorer is a mediator — no \"destroy\" button in the panel UI itself."
+    "Mirror DEL (per §9 — revised 2026-04-30): the ONLY way SheepDog touches OS. Permission model, not commit model. Fires iff: (A) user deletes bin/file INSIDE Premiere from a tracked path, (B) row DEL=on, (C) global Mirror DEL master ON (default off per #45). Diff-based execution + safety hierarchy: TRUSTED → trash, SUSPICIOUS → import wins, BROKEN → recursive autoimport-pause event fires (Axis B consequences). Timer + Cancel like Import. Always hidden in Simplified (#41). Plugin Explorer is a mediator — no \"destroy\" button in the panel UI itself."
   ));
 
   layerRow.appendChild(layerCard(
@@ -4606,7 +4820,9 @@ async function main() {
     "× on parent row (§6 × matrix): config-layer-only op. Instant, safe — doesn't touch FS or Premiere. Tooltip \"Remove folder from SheepDog\".",
     "× on child row: config-layer toggle (force-disable / restore). Plugin does NOT delete child files — user deletes in OS first, then × cleans up config (#44).",
     "Missing state: triggered by FS probe failure. Plugin does not try to \"recover\" missing files — user re-links via ⌕ or deletes entry.",
-    "Mirror DEL (§9): not a button click. User deletes a bin/file INSIDE Premiere (from a tracked path); plugin detects → arms red timer → user can Cancel during the window → OS trash on expiry. Needs row DEL=on + global Mirror DEL master switch. Structure-lock blocks the flow if bin tree is not 1:1 with SoT (use Magnet to restore parity).",
+    "Mirror DEL (§9): not a button click. User deletes a bin/file INSIDE Premiere (from a tracked path); plugin computes diff between pre-delete manifest and post-delete bin contents; if TRUSTED → arms red timer → user can Cancel → OS trash on expiry. Needs 3-way handshake (eye=on + DEL=on + master=on). SUSPICIOUS diff → import wins (re-imports instead of trashing). BROKEN diff → recursive autoimport-pause event fires (Axis B consequences). Structure-lock blocks the flow if bin tree is drifted (use Magnet to restore parity).",
+    "Two-axes violation model (spec §16): Premiere-side change without Mirror DEL alignment violates one of two orthogonal SoT axes. Axis A (drift / clips misplaced) → fires drift-detection event → row state = drifted (4px solid accentFill, cascade up to root) → Magnet recovers. Axis B (paused / files w/o clips + plugin failure) → fires autoimport-pause event → row state stays healthy, mutates row.eye stored→off (setting) + simplified.broken→true (flag) → Refresh / mode-toggle / eye flip recovers. Non-overlapping recovery tools by design. See §1 \"S6 Drifted\" + \"Event: autoimport-pause\" annotation cards.",
+    "Asymmetric ambiguity axiom: Premiere-side destruction with 3-way alignment = deliberate (Mirror DEL fires). FS-side destruction = ambiguous (always Missing — could be user delete / drive offline / eacces). Plugin never assumes destructive intent on FS side. This drives the entire error-recovery surface.",
     "Import: normal cross-boundary flow (FS read → Premiere write). User always sees progress (§10 panel). No silent imports.",
   ];
   for (const b of implBullets) {
@@ -4621,25 +4837,28 @@ async function main() {
   root.appendChild(sec13);
 
   // ==================================================
-  // §14 — Magnet + Herder Bucket · structure restoration (2026-04-25)
+  // §14 — Magnet · structure restoration (revised 2026-04-30)
   //
   // Context: users can freely rearrange bins in Premiere, and they can mix
-  // their own side-files into SheepDog-managed bins. That breaks the
-  // deterministic 1:1 mapping Mirror DEL needs (§9 structure-lock). Magnet
-  // is the "put-everything-back" button; Herder Bucket is the safe harbour
-  // for user's own files that would otherwise get destroyed by a legitimate
-  // SheepDog structural op (FLT toggle, Magnet reconciliation).
+  // their own side-files into SheepDog-managed bins. Drift = clips moved
+  // out of their tracked bin position (Axis A per spec §16). Magnet is the
+  // "put-everything-back" recovery tool — Axis A only. Refresh handles
+  // Axis B (Coverage / paused).
+  //
+  // 2026-04-30 — Herder Bucket DROPPED. Per "mediator never destructs
+  // not-its-own": side-files in orphan bins are preserved in place, never
+  // relocated. No special "safe harbour" bin needed. Side-files just stay
+  // where the user put them — through FLT toggle, Magnet, Mirror DEL.
   //
   // SUB=off soft-stop: existing files stay as legitimate (our manifest); new
   // files don't come in. FLT and Magnet continue to handle them normally.
-  // They do NOT move to Herder Bucket — that's for orphans only.
   // ==================================================
 
   const sec14 = vSec(contentW);
   sec14.itemSpacing = 16;
   sec14.appendChild(sectionTitle(
-    "§14 — Magnet + Herder Bucket · structure restoration",
-    "Magnet = \"pull everything back to SoT layout\". Herder Bucket = top-level safe harbour for user's side-files when a legit structural op would destroy them. Together they guarantee Mirror DEL's parity invariant without ever losing user data.",
+    "§14 — Magnet · Axis A recovery (revised 2026-04-30, Herder Bucket DROPPED)",
+    "Magnet = \"pull scattered clips back to SoT bin position\". Axis A recovery tool only (drift / clips misplaced). Refresh handles Axis B (paused / files w/o clips). Side-files are preserved in place — mediator never destructs not-its-own.",
     contentW
   ));
 
@@ -4661,11 +4880,11 @@ async function main() {
   mgRuleHead.appendChild(txt("Rule — SoT is OS layout; Magnet restores parity", F.s, 12, C.white, undefined, 0.5));
   mgRule.appendChild(mgRuleHead);
   mgRule.appendChild(txtW(
-    "Premiere bin tree MUST be 1:1 with OS folder tree (as SheepDog sees it) for Mirror DEL to be safe. User may rearrange bins freely — plugin watches and reports divergence (structure-lock per §9). Magnet click = reconcile: move bins back to their tracked positions; pull scattered legitimate files back into their bins. All user additions preserved.",
+    "Premiere bin tree MUST be 1:1 with OS folder tree (as SheepDog sees it) for Mirror DEL to be safe. User may rearrange bins freely — plugin watches and reports drift (Axis A per spec §16; structure-lock per §9). Magnet click = reconcile: recreate bins in SoT positions, pull scattered legitimate clips back into their tracked bins.",
     F.m, 12, C.borderBright, contentW - 40, 18
   ));
   mgRule.appendChild(txtW(
-    "Two actor classes in Magnet's world:  (1) LEGITIMATE — files/bins in SheepDog's manifest (imported by plugin, tracked).  (2) SIDE — user's own additions inside SheepDog-managed bins.  Magnet moves legitimate content to parity; user side-files either stay in place, ride along as duplicates, or land in Herder Bucket — never deleted.",
+    "Two actor classes in Magnet's world:  (1) LEGITIMATE — clips/bins in SheepDog's manifest (imported by plugin, tracked).  (2) SIDE — user's own additions inside SheepDog-managed bins. Magnet moves legitimate content to parity; user side-files stay in place — mediator never destructs not-its-own. After Magnet → row → healthy.",
     F.r, 11, C.textDim, contentW - 40, 16
   ));
   sec14.appendChild(mgRule);
@@ -4754,20 +4973,20 @@ async function main() {
   ));
   mgScenRow2.appendChild(mgScenCard(
     "Scenario D — Magnet click to restore parity",
-    "Bins scattered: user moved some out of parent bin; structure-lock blocked Mirror DEL on affected rows.",
-    "Magnet walks the scattered bins, restores each to its SoT position. Legit files pull back into their proper bins. Bins with user side-files come along intact — side-files ride the move, stay inside their bin.",
-    "Parity restored. Structure-lock cleared. Mirror DEL re-enabled on affected rows.",
-    "If a legit structural op during restore would DELETE a bin containing user side-files → side-files lift out into Herder Bucket (see below). Never silent destroy."
+    "Bins scattered: user moved some out of parent bin (drift / Axis A); rows show drifted state (4px solid accentFill, cascade up to root); structure-lock blocked Mirror DEL on affected rows.",
+    "Magnet recreates bins in their SoT positions, pulls scattered legitimate clips back into their proper bins. Bins with user side-files come along intact — side-files ride the move, stay inside their bin (mediator never destructs not-its-own).",
+    "Parity restored. drifted state cleared. Structure-lock cleared. Mirror DEL re-enabled on affected rows. After Magnet → row → healthy.",
+    "Side-files remain wherever they were placed by user. No silent moves, no \"safe harbour\" bin (Herder Bucket DROPPED 2026-04-30). User's own additions are user's territory — plugin doesn't touch them."
   ));
   sec14.appendChild(mgScenRow2);
 
-  // ---- Herder Bucket card ----
+  // ---- Herder Bucket DROPPED — explanation ----
   sec14.appendChild(divider(contentW, C.border, 0.25));
 
   const mgHerder = vSec(contentW);
   mgHerder.cornerRadius = 8;
   setFill(mgHerder, C.panel, 1);
-  setStroke(mgHerder, C.amber, 0.45, 1);
+  setStroke(mgHerder, C.strokeMid, 0.45, 1);
   mgHerder.paddingTop = 18; mgHerder.paddingBottom = 18;
   mgHerder.paddingLeft = 22; mgHerder.paddingRight = 22;
   mgHerder.itemSpacing = 10;
@@ -4776,29 +4995,29 @@ async function main() {
   mgHerderHead.counterAxisAlignItems = "CENTER";
   const mgHerderDot = figma.createFrame();
   mgHerderDot.resize(6, 6); mgHerderDot.cornerRadius = 3;
-  setFill(mgHerderDot, C.amber, 1);
+  setFill(mgHerderDot, C.strokeMid, 1);
   mgHerderHead.appendChild(mgHerderDot);
-  mgHerderHead.appendChild(txt("Herder Bucket — safe harbour for user side-files", F.s, 13, C.white, undefined, 0.5));
+  mgHerderHead.appendChild(txt("Herder Bucket — DROPPED 2026-04-30", F.s, 13, C.strokeMid, undefined, 0.5));
   mgHerder.appendChild(mgHerderHead);
 
   mgHerder.appendChild(txtW(
-    "Top-level bin at the Project root called \"Herder Bucket\". Created lazily — only when a legitimate structural op (FLT toggle, Magnet reconcile) would destroy a bin that contains user side-files. The side-files land here; the structural op proceeds on our legit content as planned.",
-    F.r, 12, C.borderBright, contentW - 44, 18
+    "Earlier design proposed a top-level \"Herder Bucket\" bin to receive user side-files when a legitimate structural op would destroy them. That bucket is no longer needed. Per the new contract: mediator never destructs not-its-own.",
+    F.m, 12, C.borderBright, contentW - 44, 18
   ));
 
-  const mgHerderRules = [
-    "Creation: lazy. First time a legit op meets user side-files in a destroy-bound bin → bucket is created. Never pre-created (keeps clean projects clean).",
-    "Location: Project root, always. Not inside any SheepDog-tracked tree — so it can't get confused with tracked structure.",
-    "Content: only user side-files at the moment of rescue. SheepDog-owned files never enter the bucket — they have canonical destinations.",
-    "Per-file origin: each rescued file carries an ExtendScript user metadata tag (origin-path, rescued-at, rescue-reason). User can trace \"where was this from?\".",
-    "Never auto-purged. User owns this bin. SheepDog won't reorganize it, won't delete it, won't magnet-pull from it. Mirror DEL doesn't touch it either.",
-    "Visible in Explorer as an UN-TRACKED bin (ghost styling TBD) — reminder that it's user territory. Out of SheepDog's management.",
+  const mgHerderDropped = [
+    "Side-files in orphan bins stay in place — through FLT toggle, Magnet, Mirror DEL. No relocation, no \"safe harbour\".",
+    "Magnet operates ONLY on legitimate clips (SheepDog manifest entries). Bins containing side-files get recreated in SoT position; clips ride; side-files stay where the user put them.",
+    "FLT toggle that would dissolve a bin containing user side-files: bin STAYS (case from old Scenario C). Our clips get pulled into the flat bucket; side-files remain in their (preserved) sub-bin.",
+    "Mirror DEL fires per diff — if user's side-file is in the bin being deleted, the diff registers as SUSPICIOUS (manifest mismatch — there's content we didn't track) → import wins, no trash. Better over-represent than nuke.",
+    "Why dropped: a separate bucket created an extra mental load (\"why did my files move there?\"). The simpler invariant — \"plugin only touches its own clips\" — is easier to reason about and respects user agency. Side-file ownership is unambiguous.",
+    "Also dropped: per-file origin metadata, lazy-creation logic, ghost-styled bucket display. All gone. Old Herder Bucket card preserved here as historical note for v1 readers.",
   ];
-  for (const rule of mgHerderRules) {
+  for (const rule of mgHerderDropped) {
     const bl = hSec(contentW - 44);
     bl.itemSpacing = 8;
     bl.counterAxisAlignItems = "MIN";
-    bl.appendChild(txt("•", F.b, 12, C.amber));
+    bl.appendChild(txt("•", F.b, 12, C.strokeMid));
     bl.appendChild(txtW(rule, F.r, 11, C.borderBright, contentW - 60, 16));
     mgHerder.appendChild(bl);
   }
@@ -5397,7 +5616,226 @@ async function main() {
       if (pi + PAL_COLS < paletteTokens.length) palCard.appendChild(spacer(10, 16));
     }
 
-    // Stack: palette on top, chk+eye pair below, button at bottom.
+    // ---------- State LED taxonomy — observable categories (S1-S6 + transient mirror-deleting) ----------
+    // NOTE 2026-04-30: autoimport-paused was REMOVED from this table. It's an EVENT (verb that
+    // mutates settings/flags), not a state. See Events table below for full event-driven mutations.
+    function stateLedDemo(tier) {
+      const f = figma.createFrame();
+      f.resize(20, 20);
+      f.layoutMode = "HORIZONTAL";
+      f.layoutSizingHorizontal = "FIXED"; f.layoutSizingVertical = "FIXED";
+      f.primaryAxisAlignItems = "CENTER"; f.counterAxisAlignItems = "CENTER";
+      f.fills = [];
+      const led = figma.createFrame();
+      if (tier === "healthy")        { led.resize(4, 4); led.cornerRadius = 2; setFill(led, Ct.accent, 1); }
+      else if (tier === "busy")      { led.resize(6, 6); led.cornerRadius = 3; led.fills = []; setStroke(led, Ct.accent, 1, 1); }
+      else if (tier === "drifted")   { led.resize(4, 4); led.cornerRadius = 2; setFill(led, Ct.accentFill, 1); }
+      else if (tier === "disabled")  { led.resize(6, 6); led.cornerRadius = 3; led.fills = []; setStroke(led, Ct.strokeMid, 1, 1); }
+      else if (tier === "missing")   { led.resize(4, 4); led.cornerRadius = 2; setFill(led, Ct.danger, 1); }
+      else if (tier === "mirror-deleting") { led.resize(6, 6); led.cornerRadius = 3; led.fills = []; setStroke(led, Ct.danger, 1, 1); }
+      else if (tier === "paused") {
+        const g = hHug(); g.itemSpacing = 3; g.counterAxisAlignItems = "CENTER";
+        const led2 = figma.createFrame(); led2.resize(4,4); led2.cornerRadius = 2; setFill(led2, Ct.accent, 1);
+        g.appendChild(led2);
+        const eyeIc = loadIcon("eyeClosed", Ct.borderBright, 11);
+        g.appendChild(eyeIc);
+        f.appendChild(g);
+        return f;
+      }
+      f.appendChild(led);
+      return f;
+    }
+
+    const W_ST_TABLE = 2 * (COL_W + 48) + 24;
+    const W_ST_INNER = W_ST_TABLE - 48;
+    const W_ST_LED = 56;
+    const W_ST_NAME = 180;
+    const W_ST_TRIGGER = 280;
+    const W_ST_RECOVERY = W_ST_INNER - W_ST_LED - W_ST_NAME - W_ST_TRIGGER - 16 * 3;
+
+    function stateHeaderRow() {
+      const r = hSec(W_ST_INNER);
+      r.itemSpacing = 16;
+      r.paddingTop = 6; r.paddingBottom = 6;
+      r.counterAxisAlignItems = "CENTER";
+      const ledCol = hSec(W_ST_LED); ledCol.primaryAxisAlignItems = "CENTER";
+      ledCol.appendChild(txt("LED", F.s, 10, Ct.textDim, undefined, 0.5));
+      r.appendChild(ledCol);
+      const nameCol = hSec(W_ST_NAME);
+      nameCol.appendChild(txt("STATE", F.s, 10, Ct.textDim));
+      r.appendChild(nameCol);
+      const trigCol = hSec(W_ST_TRIGGER);
+      trigCol.appendChild(txt("TRIGGER / CAUSE", F.s, 10, Ct.textDim));
+      r.appendChild(trigCol);
+      const recCol = hSec(W_ST_RECOVERY);
+      recCol.appendChild(txt("RECOVERY", F.s, 10, Ct.textDim));
+      r.appendChild(recCol);
+      return r;
+    }
+
+    function stateRow(tier, name, trigger, recovery) {
+      const r = hSec(W_ST_INNER);
+      r.itemSpacing = 16;
+      r.paddingTop = 10; r.paddingBottom = 10;
+      r.counterAxisAlignItems = "CENTER";
+      const ledCol = hSec(W_ST_LED);
+      ledCol.primaryAxisAlignItems = "CENTER";
+      ledCol.counterAxisAlignItems = "CENTER";
+      ledCol.appendChild(stateLedDemo(tier));
+      r.appendChild(ledCol);
+      const nameCol = vSec(W_ST_NAME);
+      nameCol.appendChild(txt(name, F.s, 12, Ct.borderBright));
+      r.appendChild(nameCol);
+      const trigCol = vSec(W_ST_TRIGGER);
+      trigCol.appendChild(txtW(trigger, F.r, 11, Ct.textDim, W_ST_TRIGGER, 15));
+      r.appendChild(trigCol);
+      const recCol = vSec(W_ST_RECOVERY);
+      recCol.appendChild(txtW(recovery, F.r, 11, Ct.textDim, W_ST_RECOVERY, 15));
+      r.appendChild(recCol);
+      return r;
+    }
+
+    const stateRows = [
+      stateRow("healthy",         "S1 — Healthy (baseline)",
+        "Default — runtime alive, autoimport flowing if eye=on. Scan is silent (not state-level).",
+        "n/a — already healthy."),
+      stateRow("busy",            "S2 — Busy (transient)",
+        "Import in-flight (auto-sync OR manual ↻). Toggles + actions render Locked tier (race-prevention). LBL stays editable.",
+        "Wait. Cancel via progress panel × (timer abort, see §10)."),
+      stateRow("disabled",        "S3 — Disabled (3 causes)",
+        "(a) own × force-disable, (b) parent SUB=off cascade, (c) parent itself disabled. Stored values preserved.",
+        "← (arrow-left in RM column) — restore force-disabled. Or unblock parent."),
+      stateRow("missing",         "S4 — Missing (folder-level)",
+        "Path unreachable: enoent / offline / eacces / other. FS-side ambiguity always → Missing per asymmetric ambiguity axiom (§16).",
+        "⌕ Relink (LNK column, always visible). Or × to clean stale config."),
+      stateRow("drifted",         "S6 — Drifted (Axis A) NEW",
+        "Premiere bin tree ≠ FS folder layout. Triggered by: bin moved with clips out of parent / file dragged to wrong bin / dedup-rejected re-import. Cascade up to root.",
+        "🧲 Magnet — recreates bin in SoT position, pulls scattered clips. Side-files preserved (Herder Bucket DROPPED)."),
+      stateRow("mirror-deleting", "Mirror-deleting (transient)",
+        "Mirror DEL flow active — diff TRUSTED → 5s timer → OS trash. Hollow red ring, parallel of Busy in red channel.",
+        "Cancel during 5s window (un-ticks DEL + stops autoimport). On expiry → row removed (no Missing carryover)."),
+    ];
+
+    const stateCard = figma.createFrame();
+    stateCard.resize(W_ST_TABLE, 10);
+    stateCard.layoutMode = "VERTICAL";
+    stateCard.layoutSizingHorizontal = "FIXED";
+    stateCard.layoutSizingVertical = "HUG";
+    stateCard.paddingTop = 24; stateCard.paddingBottom = 24;
+    stateCard.paddingLeft = 24; stateCard.paddingRight = 24;
+    stateCard.itemSpacing = 0;
+    stateCard.cornerRadius = 12;
+    setFill(stateCard, Ct.panel, 1);
+    setStroke(stateCard, Ct.border, 1, 1);
+
+    stateCard.appendChild(txt("State LED taxonomy — observable categories", F.b, 16, Ct.borderBright));
+    stateCard.appendChild(spacer(10, 4));
+    stateCard.appendChild(txtW(
+      "Five state tiers + one transient (mirror-deleting). State = what's currently observable about the row. Settings (EYE/SUB/LBL) ride orthogonal — they don't change state. Events (autoimport-pause / drift-detection / Mirror DEL diff / dedup-rejected / etc.) mutate state, settings, or flags — see Events table below. Shape × hue grammar: solid=steady (healthy/missing/drifted), hollow=transient/off (busy/disabled/mirror-deleting). 4px solid = persistent identity. 6px hollow = active or off-by-design. Hue carries channel: blue=alive, red=alarm, gray=off, dark-blue=structural mismatch.",
+      F.r, 11, Ct.textDim, W_ST_INNER, 16
+    ));
+    stateCard.appendChild(spacer(10, 16));
+    stateCard.appendChild(stateHeaderRow());
+    stateCard.appendChild(divider(W_ST_INNER, Ct.border, 1));
+    for (var si = 0; si < stateRows.length; si++) {
+      stateCard.appendChild(stateRows[si]);
+      if (si < stateRows.length - 1) stateCard.appendChild(divider(W_ST_INNER, Ct.border, 0.5));
+    }
+
+    // ---------- Events taxonomy — verbs that mutate state/settings/flags ----------
+    // Events fire under trigger conditions and have consequences. Three-tier model:
+    // States (observable) / Settings (mutable preferences) / Events (verbs).
+    // mirror-decisions.csv = event-table; this is the §REF distillation.
+
+    const W_EV_NAME = 180;
+    const W_EV_TRIGGER = 280;
+    const W_EV_STATE = 110;
+    const W_EV_SETTING = 130;
+    const W_EV_FLAG = W_ST_INNER - W_EV_NAME - W_EV_TRIGGER - W_EV_STATE - W_EV_SETTING - 16 * 4;
+
+    function evHeaderRow() {
+      const r = hSec(W_ST_INNER);
+      r.itemSpacing = 16;
+      r.paddingTop = 6; r.paddingBottom = 6;
+      r.counterAxisAlignItems = "CENTER";
+      const c1 = hSec(W_EV_NAME); c1.appendChild(txt("EVENT", F.s, 10, Ct.textDim));
+      const c2 = hSec(W_EV_TRIGGER); c2.appendChild(txt("TRIGGER", F.s, 10, Ct.textDim));
+      const c3 = hSec(W_EV_STATE); c3.appendChild(txt("MUTATES STATE", F.s, 10, Ct.textDim));
+      const c4 = hSec(W_EV_SETTING); c4.appendChild(txt("MUTATES SETTING", F.s, 10, Ct.textDim));
+      const c5 = hSec(W_EV_FLAG); c5.appendChild(txt("MUTATES FLAG / RECURSIVE", F.s, 10, Ct.textDim));
+      r.appendChild(c1); r.appendChild(c2); r.appendChild(c3); r.appendChild(c4); r.appendChild(c5);
+      return r;
+    }
+
+    function evRow(name, trigger, mutState, mutSetting, mutFlag) {
+      const r = hSec(W_ST_INNER);
+      r.itemSpacing = 16;
+      r.paddingTop = 10; r.paddingBottom = 10;
+      r.counterAxisAlignItems = "MIN";
+      const c1 = vSec(W_EV_NAME); c1.appendChild(txt(name, F.s, 12, Ct.borderBright));
+      const c2 = vSec(W_EV_TRIGGER); c2.appendChild(txtW(trigger, F.r, 11, Ct.textDim, W_EV_TRIGGER, 15));
+      const c3 = vSec(W_EV_STATE); c3.appendChild(txtW(mutState, F.r, 11, mutState === "—" ? Ct.strokeMid : Ct.borderBright, W_EV_STATE, 15));
+      const c4 = vSec(W_EV_SETTING); c4.appendChild(txtW(mutSetting, F.r, 11, mutSetting === "—" ? Ct.strokeMid : Ct.borderBright, W_EV_SETTING, 15));
+      const c5 = vSec(W_EV_FLAG); c5.appendChild(txtW(mutFlag, F.r, 11, mutFlag === "—" ? Ct.strokeMid : Ct.borderBright, W_EV_FLAG, 15));
+      r.appendChild(c1); r.appendChild(c2); r.appendChild(c3); r.appendChild(c4); r.appendChild(c5);
+      return r;
+    }
+
+    const evRows = [
+      evRow("autoimport-pause",
+        "Coverage violation (Axis B): bin/file deleted with eye=on (Mirror DEL not aligned) / cancel mid-import / non-dedup import failure",
+        "—", "row.eye stored → off",
+        "simplified.broken → true (mode flag, event-trigger contract)"),
+      evRow("drift-detection",
+        "Structure parity violation (Axis A): bin moved with clips / file dragged to wrong bin / dedup-rejected re-import",
+        "row.sot_parity → drifted (cascade up to root)", "—", "—"),
+      evRow("Mirror DEL TRUSTED",
+        "3-way handshake aligned + diff matches expected pattern (clean delete via right-click)",
+        "row → mirror-deleting (transient) → gone", "DEL stays on (auto-untick on cancel)", "—"),
+      evRow("Mirror DEL SUSPICIOUS",
+        "3-way handshake + diff has unexpected gaps / dedup-injected clips elsewhere",
+        "—", "manifest enriched", "import wins (no destruction)"),
+      evRow("Mirror DEL BROKEN",
+        "3-way handshake + manifest incoherent / session corrupted",
+        "—", "—", "recursive: fires autoimport-pause"),
+      evRow("dedup-rejected",
+        "Autoimport tries to add clip but it already exists in Premiere в чужом bin",
+        "—", "manifest enriched (rejected entry tracked)", "recursive: may fire drift-detection"),
+      evRow("ghost-row created",
+        "Relink to new path while old path still FS-physically alive (auto-disable to prevent double-observation)",
+        "new row created (force-disabled)", "—", "—"),
+      evRow("FS file/folder gone",
+        "Watcher detects path unreachable: enoent / offline / eacces / other (folder-level only)",
+        "row → missing", "—", "—"),
+    ];
+
+    const evCard = figma.createFrame();
+    evCard.resize(W_ST_TABLE, 10);
+    evCard.layoutMode = "VERTICAL";
+    evCard.layoutSizingHorizontal = "FIXED";
+    evCard.layoutSizingVertical = "HUG";
+    evCard.paddingTop = 24; evCard.paddingBottom = 24;
+    evCard.paddingLeft = 24; evCard.paddingRight = 24;
+    evCard.itemSpacing = 0;
+    evCard.cornerRadius = 12;
+    setFill(evCard, Ct.panel, 1);
+    setStroke(evCard, Ct.border, 1, 1);
+
+    evCard.appendChild(txt("Events taxonomy — verbs that mutate state / settings / flags", F.b, 16, Ct.borderBright));
+    evCard.appendChild(spacer(10, 4));
+    evCard.appendChild(txtW(
+      "Three-tier model: States (observable) / Settings (mutable preferences EYE/SUB/LBL) / Events (verbs). Events fire under trigger conditions and have consequences. Some mutate state (drift-detection, Mirror DEL TRUSTED, FS file gone). Some only mutate settings (autoimport-pause → eye stored=off). Some set flags (autoimport-pause → simplified.broken). Some are recursive (Mirror DEL BROKEN → fires autoimport-pause). Some are silent (cosmetic actions: clip rename, side-file added — not in this table). Full 16-case event matrix lives in mirror-decisions.csv.",
+      F.r, 11, Ct.textDim, W_ST_INNER, 16
+    ));
+    evCard.appendChild(spacer(10, 16));
+    evCard.appendChild(evHeaderRow());
+    evCard.appendChild(divider(W_ST_INNER, Ct.border, 1));
+    for (var ei = 0; ei < evRows.length; ei++) {
+      evCard.appendChild(evRows[ei]);
+      if (ei < evRows.length - 1) evCard.appendChild(divider(W_ST_INNER, Ct.border, 0.5));
+    }
+
+    // Stack: palette on top, chk+eye pair, state taxonomy, events taxonomy, button at bottom.
     const topRow = hSec(contentW);
     topRow.itemSpacing = 24;
     topRow.counterAxisAlignItems = "MIN";
@@ -5408,6 +5846,8 @@ async function main() {
     stack.itemSpacing = 24;
     stack.appendChild(palCard);
     stack.appendChild(topRow);
+    stack.appendChild(stateCard);
+    stack.appendChild(evCard);
     stack.appendChild(btnCard);
     return stack;
   })();
