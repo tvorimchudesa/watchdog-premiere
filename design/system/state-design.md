@@ -378,6 +378,41 @@ Exceptions to the "SheepDog read-only on disk" rule:
 
 This rule governs error recovery, data safety, mental model of plugin's "zone of control".
 
+#### Axiom of asymmetric ambiguity
+
+Plugin's response to destruction events is asymmetric by design — driven by what the plugin **can know** about user intent on each side of the boundary.
+
+| destruction trigger | plugin knows intent | response |
+|---|---|---|
+| **Premiere-side** (bin/file deleted in Premiere project panel) | **Yes — deliberate.** Mirror DEL flow requires three aligned conditions (DEL=on per row + global Mirror DEL master switch + user's explicit Premiere-side delete action). When all three align, intent is unambiguous. | If Mirror DEL fires → row gone (no `Missing` carry-over). If conditions not aligned → see two-axes violation model below. |
+| **FS-side** (file/folder deleted in Finder, drive disconnected, network share dropout, permission revoked) | **No — ambiguous.** Plugin cannot distinguish *user-initiated delete* from *drive offline* from *network mount drop* from *permissions error*. All four look identical from a watcher's perspective: path no longer reachable. | Always → row state = `missing`, with retry strategy gated by subtype (enoent/offline/eacces/other). Plugin never assumes destructive intent on the FS side. |
+
+**Why this asymmetry matters:**
+The plugin **mediates** between Premiere and the FS. On the Premiere side it can observe a complete user gesture (3-way handshake); on the FS side it sees only the result of an event. Treating both with the same severity would either:
+- (a) lose data — auto-trash files when a drive briefly disconnects, OR
+- (b) spam the explorer — flag every deliberate Mirror DEL as an unrecoverable `Missing` row.
+
+**Two-axes violation model (when Premiere-side destruction does NOT trigger Mirror DEL):**
+
+A Premiere-side change that doesn't satisfy Mirror DEL conditions can still violate one of two orthogonal SoT axes:
+
+| axis | what it is | violated by | recovery tool |
+|---|---|---|---|
+| **A — Structure parity** | Premiere bin tree must be 1:1 with OS folder layout (the FS SoT) | bin/file *moved* in Premiere out of its tracked position | **Magnet** — recreates/moves bins back to SoT positions |
+| **B — Content coverage** | Autoimport policy promises "every file in tracked path is represented as a clip in the corresponding bin" | bin/file *deleted* in Premiere with eye=on (autoimport was actively maintaining coverage) | **Refresh / Check & Import** — re-imports missing clips into existing bins |
+
+The two recovery tools are non-overlapping by design:
+- Magnet fixes **paths**. Doesn't re-import content beyond what's needed for structure restoration.
+- Refresh fixes **content**. Operates only on existing bins; doesn't recreate moved/deleted bins.
+
+Two-step recovery is explicit when both axes are violated (move + delete content): Magnet first (rebuild structure), then Refresh (refill content).
+
+**State indicators:**
+- Axis A violated → row state = `drifted` (yellow LED, hollow 6px)
+- Axis B violated → row's eye auto-flipped to `off` (visual: eye-closed glyph). Footer counter shows `N autoimport-paused — Refresh to resync`. Row state stays `healthy` (FS unchanged, no truth violation).
+
+**Eye=off + Premiere-side delete** = `healthy`, do nothing. No autoimport policy was active → no policy to violate.
+
 ---
 
 ## Key decisions log
