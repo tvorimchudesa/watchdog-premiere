@@ -650,7 +650,7 @@ Watcher buffers DELETE+ADD events в time window (e.g. 1s). Matching name+size+m
      - Bin survived FLT=on (had side-files, marked «FLT-displaced») → **transfer back** to SoT position via moveItem (preserves nodeId + side-files inside)
    - **Mirror DEL** — 3-way handshake
    - **Merge cleanup** — incoming side's emptied bins после content transfer
-   - **Relink restructure cleanup** — empty bins matching gone-folders (bins не survived relink because their FS counterpart absent в new path AND no side-files inside)
+   - **Relink restructure cleanup** — empty bins matching gone-folders без side-files inside. **Rare in practice** — обычно clips либо rebase (file match) либо становятся side-files (rule 25), и bins содержат side-files → cannot auto-delete. Truly empty bins без side-files редкий случай.
 - Operations что НЕ удаляют: Magnet (restructures positions only, never deletes), × healthy child (force-disable, не destroy), FS events
 
 **17. Row destruction outcomes** — destruction triggers:
@@ -710,12 +710,22 @@ After destruction:
 - File-axis affects dedup, drift detection, side-file detection — но **НЕ row state**
 - File missing/moved doesn't put row в Missing — folder gone does
 
-**25. Side-files mechanic** — clip that left plugin's coverage становится side-file (mirror к side-bins). Creation events:
-- User imports file via Premiere directly into plugin-owned bin (case #6)
-- User relinks Premiere clip to FS path outside tracked roots
-- Single file moved out of tracked folder + relinked в Premiere to unwatched
+**25. Side-files mechanic / Path coverage = подданство** — clip's legitimacy = its FS path is covered by some tracked row.
+
+**Core principle (user's metaphor):** «Files становятся side, когда нет НИ одного row который бы покрывал его путь. Покрытие пути является знаком подданства плагину. Нет покрытия пути, нет подданства.»
+
+Side-file transitions (clip → side-file when):
+- **Row's path moves** (relink): clips at old absolute path lose row coverage → side-files
+- **Row destroyed** (× root, × missing child): clips at row's path lose coverage → side-files
+- **User imports file via Premiere directly** (case #6): never had coverage → side-file from start
+- **User relinks Premiere clip to FS path outside tracked roots**: clip's new path uncovered → side-file
+- **Single file moved out of tracked folder + Premiere-relinked to unwatched**: same as above
 
 Plugin никогда не trogает side-files. Bin содержащий side-file → blocked from auto-deletion (rule 16 condition).
+
+**Symmetry с bin legitimacy (rule 22):**
+- Bin legitimacy = manifest membership
+- Clip legitimacy = FS path coverage by row (= row's «виза» для clip's подданства)
 
 **26. Drift formal definition** — DRIFT triggered when ALL hold:
 1. File **exists в FS** at path P (under tracked root)
@@ -805,7 +815,7 @@ Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via 
 
 🟢 **Foundational rules:** 27 explicit rules locked (1-13 existing + 14-27 new in this session). Decision matrix derived from rules.
 
-📋 **Decision Matrix:** [`relink-merge-matrix.ru.csv`](relink-merge-matrix.ru.csv) — 35 cases (4 Add + 31 Relink). 4 edge cases (E1-E4) for further discussion в WIP doc.
+📋 **Decision Matrix:** [`relink-merge-matrix.ru.csv`](relink-merge-matrix.ru.csv) — 29 cases (4 Add + 25 Relink, после consolidation «already tracked» в MERGE category). 4 edge cases (E1-E4) for further discussion в WIP doc.
 
 ---
 
