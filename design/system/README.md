@@ -35,6 +35,10 @@ is the **visual realization** of these specs — when they conflict, this folder
   recovery paths in both Advanced and Simplified modes. This is essentially
   an event-table — see state-design.md §"Events" section.
 - **`mirror-decisions.ru.csv`** — то же по-русски (тождественная структура).
+- **`relink-merge-matrix.ru.csv`** — 35-case decision matrix для relink/merge
+  operations (4 Add Folder + 31 Relink × source state × target path type).
+  Cells derived from foundational rules 1-27 в `edge-cases-wip.md`. Working
+  draft — review in spreadsheet form.
 
 ## Versioning
 

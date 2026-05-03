@@ -595,7 +595,162 @@ Watcher buffers DELETE+ADD events в time window (e.g. 1s). Matching name+size+m
 
 ---
 
-## Closed / resolved (для reference)
+## Foundational rules (27 explicit rules)
+
+После сессии 2026-04-30: extracted всё что implicit'но или явно locked в систему правил. Решения в decision matrix derive from these.
+
+### Принципы (semantic-уровень)
+
+**1. FS = SoT** — plugin reflects FS truth. Folder existуeт на FS → walker tracks. Никаких ghost rows. (T3.3)
+
+**2. Mediator never destructs not-its-own** — side-files / side-bins preserved через все operations. (T2.6, §14 Magnet)
+
+**3. Asymmetric ambiguity axiom** — Premiere-side destruction = deliberate (3-way handshake), FS-side = ambiguous → Missing. (§16)
+
+**4. Eye = trigger timing, DEL = outbound permission** — orthogonal axes. (parked-notes 2.1)
+
+**5. Manifest = full FS knowledge** — incl. dedup-rejected entries. (parked-notes 2.4)
+
+### State / data model
+
+**6. Three-tier model** — States observable / Settings mutable / Events verbs. Idempotent, sequential. (state-design §"Events")
+
+**7. Two-axes violations** — Axis A drift (clips misplaced) / Axis B paused (Coverage broken). Non-overlapping recovery (Magnet vs Refresh). (§16)
+
+**8. Two-flag disability** — `manually_disabled` + `forced(reason)` composable. Reasons: parent-sub-off / parent-disabled / path-missing. NO auto-ghost. (T1.1)
+
+**9. Per-row effective_enabled** — override-enable possible despite cascade. Auto-create empty placeholder bins для ancestor chain when descendant enabled. (T2.1')
+
+**10. Live-bind inheritance** — children с no stored value follow parent live, pin breaks. Settings has «Children defaults» с per-column I/D choice. (T3.2)
+
+**11. Mirror DEL via diff + safety hierarchy** — TRUSTED → trash; SUSPICIOUS → block + uncheck DEL + recursive autoimport-pause; BROKEN → recursive autoimport-pause. (§16, T1.3)
+
+### Identity / display
+
+**12. Source Name ≠ Bin Name** — bin label independent of FS path. Bin label is cosmetic, follows merge dialog choice. (case #12, T2.6, T3.2 #20)
+
+**13. «Виноградная ветвь»** — children translocate dead-weight Missing on relink without folder-name-match. (T2.6)
+
+### NEW (locked в этой session)
+
+**14. Path operations relative-from-row** — drift detection, dedup, merge name-matching сравнивают paths relative от tracked root, не absolute. Manifest stores relative paths internally. Absolute computed at runtime: `row.path + "/" + child.relative`.
+
+**15. Add ≠ Relink** — different gestures, both на PATH:
+- **Add Folder / drag-drop**: create new row → REFUSE если path occupied (duplicate-tracking)
+- **Relink**: move existing row → ALLOW merge если target covered
+
+**16. Bin deletion conditions** — plugin deletes bin ONLY когда все hold:
+1. Bin в plugin's manifest (legitimate plugin-owned)
+2. Bin не содержит side-files (clip-level user content)
+3. Bin не содержит side-bins (recursive sub-bin user content)
+4. Deletion триггерится explicit operation:
+   - **FLT toggle** — flattened-away bins
+   - **Mirror DEL** — 3-way handshake
+   - **Merge cleanup** — incoming side's emptied bins
+- Operations что НЕ удаляют: Magnet (restructures), × row (becomes side-bin), FS events
+
+**17. Row destruction outcomes** — destruction triggers:
+- × on root (any state) → remove from config
+- × on missing child → cleanup config entry
+- Merge target absorbs source
+
+NOT destruction: × on healthy child = force-disable (soft-stop). × on disabled child = restore.
+
+After destruction:
+- Children: dead-weight Missing under new parent (merge case) или vanish если no walker covers (× standalone root)
+- Old FS path: handled per FS-SoT (re-detected if under tracked root → fresh row reimport; standalone → vanishes)
+- Premiere bins: demoted to side-bins (per rule 16)
+
+**18. Merge = explicit user gesture only** — never auto-triggered by FS events. Walker не auto-merges.
+
+**19. Path coverage = recursive walker reach** — refuse rule applies к ANY path within tracked root's recursive coverage, даже если row для него ещё не создан.
+
+**20. Bin label cosmetic, follows merge choice** — bin labels = display attribute, обрабатываются как и functional settings — receiving vs incoming dialog choice cascades.
+
+**21. Three dedup levels + autoimport-pause on file-dedup** — autoimport pipeline:
+- **dedup-path** — file already в manifest at этом row → skip
+- **dedup-file** — file content (name+size+mtime) matches existing Premiere clip ANYWHERE (incl. offline) → skip + force-fire autoimport-pause event for healthy rows (Missing rows already disabled, не paused)
+- **no dedup** — file new content → import
+
+**22. Side-bin status taxonomy + full ignore** — bin "ownership" категории:
+- **Legitimate plugin-owned** — в manifest + tracked by alive row (incl. Missing row's bins)
+- **Side-bin** — NOT в manifest (user-created в Premiere outside plugin OR demoted from legitimate)
+- Plugin полностью игнорирует side-bins, не touches никогда (Magnet может pull files OUT, но не delete/move bin)
+
+**23. Plugin tracks via Premiere nodeId, not path** — manifest stores nodeIds для bins/clips. Operations use nodeId (changeMediaPath, moveItem, removeItem). Identity stable across relink/merge.
+
+**24. Two matching axes** — folders↔rows↔bins match by **folder-name** (relative path). Files↔clips match by **content** (name+size+mtime). Different axes:
+- Row state (Missing/Healthy/Drifted) driven by **folder-axis only**
+- File-axis affects dedup, drift detection, side-file detection — но **НЕ row state**
+- File missing/moved doesn't put row в Missing — folder gone does
+
+**25. Side-files mechanic** — clip that left plugin's coverage становится side-file (mirror к side-bins). Creation events:
+- User imports file via Premiere directly into plugin-owned bin (case #6)
+- User relinks Premiere clip to FS path outside tracked roots
+- Single file moved out of tracked folder + relinked в Premiere to unwatched
+
+Plugin никогда не trogает side-files. Bin содержащий side-file → blocked from auto-deletion (rule 16 condition).
+
+**26. Drift formal definition** — DRIFT triggered when ALL hold:
+1. File **exists в FS** at path P (under tracked root)
+2. File **exists в Premiere** as clip (any state — online OR offline)
+3. Clip's **parent bin в Premiere ≠ expected bin** (= bin что mirrors FS folder containing P per row's manifest)
+
+→ Row covering P → DRIFT state.
+
+NOT drift:
+- File not yet imported (absent в Premiere) — это «pending import», not drift
+- Clip offline + at original FS path — clip's path matches expected bin → no drift
+- File relinked to unwatched location → side-file, not drift
+
+Drift cleared by: Magnet OR Merge.
+
+**27. Three-operations on bin legitimacy** — manifest membership = boolean legitimacy implicit. No explicit field needed:
+- **Confer** = ADD bin entry to manifest (at row creation)
+- **Transfer** = MOVE manifest entry from source row to target row при merge (preserves nodeId, Premiere object continuity)
+- **Withdraw** = REMOVE manifest entry → bin становится side-bin implicitly
+
+Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via diff (Premiere bin tree − manifest = side-bins).
+
+---
+
+## Decision Matrix
+
+> Matrix вынесена в отдельный CSV для удобства review/edit в spreadsheet:
+>
+> **[`relink-merge-matrix.ru.csv`](relink-merge-matrix.ru.csv)** — 35 cases (4 Add Folder + 31 Relink). Columns: action / source_state / target_path / outcome / row_after / children_fate / old_fs_path / bins_fate / rules_applied / notes.
+>
+> Cells derivable from foundational rules 1-27 выше. Если case не выводится — gap, нужно discuss.
+
+### Edge cases для дискуссии (требуют user decision)
+
+После прохождения matrix выявлены потенциальные edge cases, не однозначно derivable from rules:
+
+**E1 — Relink across tracked tree boundary:**
+- Source row Healthy child под Root1
+- Target = path under Root2 (other tracked root)
+- Что значит «свободный path»? Если path под Root2's recursive coverage → covered (rule 19) → MERGE? Или просто under Root2 = becomes child of Root2?
+- **Discussion needed:** target classification — «свободный» means «не в any tracked root coverage»; если under another tracked root но row для него ещё не создан — это считается covered (rule 19) → merge, не free move. Это rules-derivable если строго применять #19, но worth confirming.
+
+**E2 — Relink Drifted row на path где no clips (clean folder):**
+- Source row Drifted (clips misplaced в Premiere)
+- Target = path где нет files
+- After relink: row at new empty path → walker finds nothing → row becomes... empty Healthy? Drift status preserved или cleared?
+- **Discussion needed:** drift definition rule 26 requires file existence в FS. If new path empty → no drift trigger → drift cleared by virtue of nothing to drift on. Old clips (где они were) → handled per FS-SoT.
+
+**E3 — Merge during active autoimport:**
+- Plugin currently importing files for new row (busy state)
+- User triggers merge на другую row
+- Race condition — merge dialog UI vs ongoing import
+- **Discussion needed:** queue merge until import done? Or refuse with «busy»? Per rule 6 (Busy = race-prevention) — likely refuse с toast.
+
+**E4 — Multiple roots renamed simultaneously creating overlap:**
+- Edge of T4.1 — user does multiple FS rename ops в quick succession
+- Multiple roots become Missing simultaneously
+- Plugin receives delayed events
+- **Discussion needed:** processing order, race resolution. Per rule 1.5 events sequential idempotent → just process in arrival order, each independently. Should converge but worth validating.
+
+---
 
 - ~~Manual bin deletion in Premiere~~ → resolved by Mirror DEL §9
 - ~~Simplified / Easy Mode naming~~ → resolved §13
@@ -611,13 +766,18 @@ Watcher buffers DELETE+ADD events в time window (e.g. 1s). Matching name+size+m
 ⚫ **PARKED (5 items):** T2.1 / T2.4 / T3.6 / T3.7 / T3.8
 
 🔴 **OPEN — deep-dive block:**
-- **T4.1** — Root-inside-root (depends on T4.3 lock first)
-- **T4.3** — Merge linking mechanic (main block, 6 sub-questions awaiting confirm)
+- **T4.1** — Root-inside-root (mostly resolves через matrix RESTRUCTURE column)
+- **T4.3** — Merge linking mechanic (matrix покрывает основное, остаются edge cases E1-E4)
+
+🟢 **Foundational rules:** 27 explicit rules locked (1-13 existing + 14-27 new in this session). Decision matrix derived from rules.
+
+📋 **Decision Matrix:** [`relink-merge-matrix.ru.csv`](relink-merge-matrix.ru.csv) — 35 cases (4 Add + 31 Relink). 4 edge cases (E1-E4) for further discussion в WIP doc.
 
 ---
 
 ## Next steps
 
-1. **Sync sweep** для всех 🟢 LOCKED items в spec/parked-notes/mockup (~13 items, separate commit)
-2. **Deep-dive session** на T4.1 + T4.3 (merge linking) — 6 sub-questions awaiting user input
+1. **User reviews matrix** — walk through cases, validate cells, identify gaps. Address E1-E4 edge cases.
+2. **Lock matrix** — when satisfied, all relink/merge decisions are derivable.
+3. **Sync sweep** для всех 🟢 LOCKED items + matrix в spec/parked-notes/mockup (single commit или две части).
 3. **After deep-dive lock** — second sync sweep для T4.1/T4.3
