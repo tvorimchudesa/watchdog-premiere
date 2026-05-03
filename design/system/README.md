@@ -19,6 +19,10 @@ is the **visual realization** of these specs — when they conflict, this folder
   (e.g. eye pause persistence, Source/Bin Name toggle, mirror DEL diff
   hierarchy implementation). Also tracks polish-bucket items deferred
   to v1.1+.
+- **`edge-cases-wip.md`** — working doc for open architectural questions.
+  Status-marked (🟢 LOCKED / 🟡 LEANING / 🔴 OPEN / ⚫ PARKED). Decisions
+  lock here first, then sync into spec/parked-notes/mockup. Once a question
+  fully syncs, move to «Closed» section at bottom of the WIP doc.
 
 ### Data tables (CSV)
 
