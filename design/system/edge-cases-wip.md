@@ -644,22 +644,31 @@ Watcher buffers DELETE+ADD events в time window (e.g. 1s). Matching name+size+m
 2. Bin не содержит side-files (clip-level user content)
 3. Bin не содержит side-bins (recursive sub-bin user content)
 4. Deletion триггерится explicit operation:
-   - **FLT toggle** — flattened-away bins
+   - **FLT toggle ON** — flattened-away bins (если no side-files; иначе bin survives as «FLT-displaced»)
+   - **FLT toggle OFF**: conditional behavior:
+     - Bin was destroyed на FLT=on (no side-files) → **recreate** new bin at SoT position (MVP default — convenient for user)
+     - Bin survived FLT=on (had side-files, marked «FLT-displaced») → **transfer back** to SoT position via moveItem (preserves nodeId + side-files inside)
    - **Mirror DEL** — 3-way handshake
-   - **Merge cleanup** — incoming side's emptied bins
-- Operations что НЕ удаляют: Magnet (restructures), × row (becomes side-bin), FS events
+   - **Merge cleanup** — incoming side's emptied bins после content transfer
+   - **Relink restructure cleanup** — empty bins matching gone-folders (bins не survived relink because their FS counterpart absent в new path AND no side-files inside)
+- Operations что НЕ удаляют: Magnet (restructures positions only, never deletes), × healthy child (force-disable, не destroy), FS events
 
 **17. Row destruction outcomes** — destruction triggers:
 - × on root (any state) → remove from config
 - × on missing child → cleanup config entry
-- Merge target absorbs source
+- Merge target absorbs source (source row destroyed после content transfer)
 
 NOT destruction: × on healthy child = force-disable (soft-stop). × on disabled child = restore.
 
 After destruction:
 - Children: dead-weight Missing under new parent (merge case) или vanish если no walker covers (× standalone root)
 - Old FS path: handled per FS-SoT (re-detected if under tracked root → fresh row reimport; standalone → vanishes)
-- Premiere bins: demoted to side-bins (per rule 16)
+- Premiere bins:
+  - × root → demoted to side-bins (no transfer happens, manifest entries removed)
+  - × missing child → manifest entry removed, bin demoted
+  - **Merge** → bins transfer to target's manifest (NOT demoted — they ride with content). Source's emptied bins после transfer → delete per rule 16.
+
+**Метафора (от user)**: row = bin's **виза**. Без row → no виза → no легитность. Bin's tourist visa expires при row destruction.
 
 **18. Merge = explicit user gesture only** — never auto-triggered by FS events. Walker не auto-merges.
 
@@ -672,10 +681,27 @@ After destruction:
 - **dedup-file** — file content (name+size+mtime) matches existing Premiere clip ANYWHERE (incl. offline) → skip + force-fire autoimport-pause event for healthy rows (Missing rows already disabled, не paused)
 - **no dedup** — file new content → import
 
-**22. Side-bin status taxonomy + full ignore** — bin "ownership" категории:
+**22. Side-bin status taxonomy + position independence** — bin имеет ДВЕ независимые axes:
+
+**Axis 1 — Legitimacy** (manifest membership = boolean):
 - **Legitimate plugin-owned** — в manifest + tracked by alive row (incl. Missing row's bins)
-- **Side-bin** — NOT в manifest (user-created в Premiere outside plugin OR demoted from legitimate)
-- Plugin полностью игнорирует side-bins, не touches никогда (Magnet может pull files OUT, но не delete/move bin)
+- **Side-bin** — NOT в manifest (user-created в Premiere outside plugin OR demoted from legitimate when row vanished)
+
+**Axis 2 — Position** (где bin physically located в Premiere bin tree):
+- **At SoT-expected position** — clean state, mirrors FS structure
+- **Displaced** — user moved bin / FLT-survived with side-files / etc. Position mismatch с expected.
+
+**Position is independent от legitimacy.** Plugin tracks по nodeId — bin can move в Premiere without losing legitimacy.
+
+**Behavior matrix:**
+
+| legitimacy × position | autoimport | drift trigger | recovery |
+|---|---|---|---|
+| Legitimate × at-SoT | ✓ normal | none | n/a |
+| Legitimate × displaced | ✓ continues (files import into displaced bin) | YES — when first clip lands → drift fires per rule 26 | Magnet moves bin back to SoT (с side-files inside) |
+| Side-bin × any position | ✗ plugin ignores | n/a | Magnet может pull files OUT, но bin не touched |
+
+**Rule of thumb** (user's metaphor): row = bin's виза. Без row → no виза → side-bin.
 
 **23. Plugin tracks via Premiere nodeId, not path** — manifest stores nodeIds для bins/clips. Operations use nodeId (changeMediaPath, moveItem, removeItem). Identity stable across relink/merge.
 
@@ -698,19 +724,27 @@ Plugin никогда не trogает side-files. Bin содержащий side-
 
 → Row covering P → DRIFT state.
 
+**Bin movement triggers drift through clip-axis**: если user moves displaced bin containing clips → all contained clips effectively at new position → drift fires on those clips. Empty displaced bin = silent (no drift) until first file imports.
+
 NOT drift:
 - File not yet imported (absent в Premiere) — это «pending import», not drift
 - Clip offline + at original FS path — clip's path matches expected bin → no drift
 - File relinked to unwatched location → side-file, not drift
+- Empty displaced bin — silent until file enters
 
-Drift cleared by: Magnet OR Merge.
+Drift cleared by: Magnet (moves bin OR clip back to SoT, side-files preserved) OR Merge (auto-dedup migrates).
 
-**27. Three-operations on bin legitimacy** — manifest membership = boolean legitimacy implicit. No explicit field needed:
-- **Confer** = ADD bin entry to manifest (at row creation)
-- **Transfer** = MOVE manifest entry from source row to target row при merge (preserves nodeId, Premiere object continuity)
-- **Withdraw** = REMOVE manifest entry → bin становится side-bin implicitly
+**27. Four-operations on bin legitimacy + position** — manifest membership = boolean legitimacy implicit. No explicit field needed:
 
-Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via diff (Premiere bin tree − manifest = side-bins).
+**Legitimacy ops (manifest membership changes):**
+- **Confer** = ADD bin entry to manifest (at row creation: walker discovery / Add Folder UI)
+- **Transfer** = MOVE manifest entry from source row to target row при merge (preserves nodeId, Premiere object continuity, bin physically moves via moveItem)
+- **Withdraw** = REMOVE manifest entry → bin становится side-bin implicitly (× root, × missing child, OR merge source after content fully transferred)
+
+**Position ops (no legitimacy change, bin stays in manifest):**
+- **Restructure** = update relative path mapping when row's path changes (relink). Bins re-mirrored to new FS structure: matching folders kept (paths updated), non-matching empty bins без side-files → delete per rule 16, non-matching bins с content → drift detected.
+
+Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via diff (Premiere bin tree − manifest = side-bins). Position determinable per nodeId path в Premiere bin tree.
 
 ---
 
