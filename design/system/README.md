@@ -23,6 +23,12 @@ is the **visual realization** of these specs — when they conflict, this folder
   Status-marked (🟢 LOCKED / 🟡 LEANING / 🔴 OPEN / ⚫ PARKED). Decisions
   lock here first, then sync into spec/parked-notes/mockup. Once a question
   fully syncs, move to «Closed» section at bottom of the WIP doc.
+- **`sync-plan-wip.md`** — multi-session tracker for sync sweep applying
+  decisions from `edge-cases-wip.md` into `state-design.md` /
+  `parked-notes.md` / `mirror-decisions.csv` / `panel.figma-script.js`.
+  5 phases, each phase = separate session с fresh context. Self-contained:
+  any session can pick up cold by reading this doc. Archived after sync
+  complete.
 
 ### Data tables (CSV)
 
