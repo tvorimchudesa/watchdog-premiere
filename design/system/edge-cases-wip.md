@@ -18,49 +18,104 @@
 
 ---
 
-## 🚨 Active deep-dive block (NEXT)
+## ✅ ALL ITEMS RESOLVED (2026-05-04)
 
-После lock'а всех confirmed items ниже — **T4.1 + T4.3 это единый архитектурный блок**:
-- T4.1 — Root-inside-root через OS rename / move
-- T4.3 — Merge linking mechanic (Missing row → existing covered path)
+After session work, **все open items locked**. Decision matrix complete (29 cases). Foundational rules refined to 27 explicit principles. Disable taxonomy v2 (three-layer) replaces previous two-flag model.
 
-Они tightly связаны: оба про situation когда FS-side move создаёт overlap между tracked roots, и оба требуют merge / dedup logic. Решать вместе.
-
-См. секции внизу (Tier 4) — там discussion notes собраны для focused session.
+**Next step:** sync sweep — apply locked decisions into `state-design.md` / `parked-notes.md` / `mirror-decisions.csv` / `panel.figma-script.js`. См. Sync targets per rule above.
 
 ---
 
 ## Tier 1 — Blocks implementation
 
-### T1.1 — Force-disable child storage 🟢 LOCKED (two-flag model)
+### T1.1 — Disable taxonomy 🟢 LOCKED (three-layer model, refined 2026-05-04)
 
-**Q**: как мы запоминаем что child row force-disabled между запусками плагина?
+**Q**: как мы запоминаем что row disabled, и как layers взаимодействуют между собой?
 
-**Decision**: Two-flag composable model.
+**Decision**: **Three-layer disable model** с priority ordering.
 
-**Per-row flags:**
-- `manually_disabled: bool` — set by user × click. Cleared by user ← click. Independent of FS / parent state.
-- `forced(reason)` — set by plugin under conditions. Reasons:
-  - `parent-sub-off` — auto-clears when parent SUB → on
-  - `parent-disabled` — auto-clears when parent re-enables
-  - `path-missing` — auto-clears when path returns
-  - ~~`auto-ghost`~~ — **ELIMINATED** per T3.3 (FS-SoT principle, no ghost rows needed)
+#### Layer 1 — System Force (DSF)
 
-**Effective state**:
+- **Trigger**: walker detects path missing на FS-side
+- **Strongest** — cannot be overridden by manual (path физически не существует)
+- **Auto-clears** когда path returns
+- **Note**: в spec model это собственно state Missing (S4) — он subsumes disable considerations. При path missing → row state = Missing, layers 2-3 stored но inert.
+
+#### Layer 2 — Manual Intent (MI) — three-valued
+
 ```
-effective_disabled = manually_disabled OR (forced != null)
+manual_intent: "none" | "disable" | "enable"
 ```
 
-**Recovery asymmetry:**
-- `←` clears `manually_disabled` only
-- Plugin auto-clears `forced` when cause clears
-- Both flags can coexist (rare combo) — both must clear для row → enabled
+- Set by user через × / ← clicks (glyph context-aware per spec §6 × matrix)
+- **Persistent** across cascade changes (Apple-like respect for user's explicit choice)
+- ← gesture sets `"enable"` (override cascade)
+- × gesture sets `"disable"`
+- **Two-state toggle per click**: повторный click того же glyph → clear к `"none"` → state revert per rules (cascade или Healthy).
+
+#### Layer 3 — Cascade (DC) — computed
+
+```
+cascade_disable = parent.SUB == "off" OR parent.effective_disabled
+```
+
+- **OR logic for activation** — любой источник включает cascade
+- **AND logic for deactivation** — все источники должны быть off чтобы clear:
+  ```
+  DC_inactive = parent.SUB == "on" AND parent.effective_enabled
+  ```
+- Computed dynamically, не stored. Re-evaluates on parent change.
+
+#### Effective state computation
+
+```
+if path_missing:
+    state = Missing  (S4 — subsumes all disable; layers 2-3 inert)
+elif manual_intent == "disable":
+    state = Disabled  (cause: manual)
+elif manual_intent == "enable" AND cascade_disable:
+    state = Enabled  (manual override of cascade)
+elif cascade_disable:
+    state = Disabled  (cause: cascade)
+else:
+    state = Healthy / Busy / Drifted etc.
+```
+
+**Single observable LED** для всех Disabled causes (per existing spec §S3). Visual taxonomy не differentiates causes — все hollow gray 6px. Cause differentiation via tooltip parked (T2.1).
+
+#### UX gestures (× / ← context-aware)
+
+Glyph determined by current state per spec §6 × matrix:
+
+| current state | shown glyph | click effect |
+|---|---|---|
+| Healthy (manual_intent=none) | × | manual_intent → `"disable"`. Effective: Disabled-Manual |
+| Disabled-Manual | ← | manual_intent → `"none"`. Effective: per cascade (Disabled-Cascade or Healthy) |
+| Disabled-Cascade (manual_intent=none) | ← | manual_intent → `"enable"`. Effective: Enabled (override) |
+| Enabled-OverrideCascade (manual_intent=enable) | × | manual_intent → `"none"`. Effective: per cascade (back to Disabled-Cascade) |
+
+**Toggle semantic:** один click sets relative intent, повторный click clears к "none". Третьего click нет — для смены directionality нужно сначала clear, потом противоположный glyph (который появится после clear).
+
+#### Persistence rule
+
+Manual intent **persists** across cascade changes. Concrete:
+
+```
+1. parent SUB=off → cascade_disable. manual_intent=none. Effective: Disabled-Cascade.
+2. User ← на child → manual_intent="enable". Effective: Enabled (override).
+3. parent SUB→on → cascade_disable=false. manual_intent still "enable". Effective: Enabled (cascade off, manual moot но persisted).
+4. parent SUB→off again → cascade_disable=true. manual_intent still "enable". Effective: Enabled (manual overrides cascade).
+5. User × на child → manual_intent="disable". Effective: Disabled-Manual.
+```
+
+User's explicit click никогда не auto-cleared cascade flips. Mediator-respect.
 
 **Sync targets**:
-- `state-design.md` §"5. Disabled causes" — extend with two-flag model
-- `state-design.md` §"7. Ghost row" — переименовать / переписать (см. T3.3)
+- `state-design.md` §"5. Disabled causes" — replace 3-causes-1-runtime model с three-layer taxonomy
+- `state-design.md` §6 × matrix — extend с two-state toggle behavior
+- `state-design.md` §12 Tier model — manual_intent integration
 - Decision log entry
-- Config schema (при implementation)
+- Config schema: `manual_intent: enum` field per row
 
 ---
 
@@ -617,7 +672,7 @@ Watcher buffers DELETE+ADD events в time window (e.g. 1s). Matching name+size+m
 
 **7. Two-axes violations** — Axis A drift (clips misplaced) / Axis B paused (Coverage broken). Non-overlapping recovery (Magnet vs Refresh). (§16)
 
-**8. Two-flag disability** — `manually_disabled` + `forced(reason)` composable. Reasons: parent-sub-off / parent-disabled / path-missing. NO auto-ghost. (T1.1)
+**8. Three-layer disable taxonomy** — disable composes from three independent layers с priority ordering: **System Force** (path-missing, strongest) → **Manual Intent** (`"none" | "disable" | "enable"`, three-valued, persistent) → **Cascade** (computed from parent SUB=off OR parent.disabled, OR-activate / AND-deactivate). Single observable LED. (T1.1 v2 refined 2026-05-04)
 
 **9. Per-row effective_enabled** — override-enable possible despite cascade. Auto-create empty placeholder bins для ancestor chain when descendant enabled. (T2.1')
 
@@ -706,9 +761,13 @@ After destruction:
 **23. Plugin tracks via Premiere nodeId, not path** — manifest stores nodeIds для bins/clips. Operations use nodeId (changeMediaPath, moveItem, removeItem). Identity stable across relink/merge.
 
 **24. Two matching axes** — folders↔rows↔bins match by **folder-name** (relative path). Files↔clips match by **content** (name+size+mtime). Different axes:
-- Row state (Missing/Healthy/Drifted) driven by **folder-axis only**
-- File-axis affects dedup, drift detection, side-file detection — но **НЕ row state**
+- Row state (Missing/Healthy/Disabled) driven primarily by **folder-axis**
+- File-axis affects dedup, side-file detection — обычно НЕ row state
 - File missing/moved doesn't put row в Missing — folder gone does
+
+**ИСКЛЮЧЕНИЕ — Drift state:** drift это **единственный** путь когда file может повлиять на row state. Файл под подданством row (его FS path covered by row) находящийся не в expected bin → triggers drift на этой row + cascade up to root. То же для bin — если bin находится не в expected position → triggers drift на себя + cascade up.
+
+Drift = file-axis exception к правилу «row state driven by folder-axis only».
 
 **25. Side-files mechanic / Path coverage = подданство** — clip's legitimacy = its FS path is covered by some tracked row.
 
@@ -727,20 +786,24 @@ Plugin никогда не trogает side-files. Bin содержащий side-
 - Bin legitimacy = manifest membership
 - Clip legitimacy = FS path coverage by row (= row's «виза» для clip's подданства)
 
-**26. Drift formal definition** — DRIFT triggered when ALL hold:
-1. File **exists в FS** at path P (under tracked root)
+**26. Drift formal definition** — единственный path по которому file/bin может повлиять на row state.
+
+**Drift triggered (clip-level)** when ALL hold:
+1. File **exists в FS** at path P (under tracked root → covered by row)
 2. File **exists в Premiere** as clip (any state — online OR offline)
 3. Clip's **parent bin в Premiere ≠ expected bin** (= bin что mirrors FS folder containing P per row's manifest)
 
-→ Row covering P → DRIFT state.
+**Drift triggered (bin-level)** when:
+1. Bin в plugin's manifest (legitimate)
+2. Bin's parent в Premiere ≠ expected parent (= bin не находится в той position где должен быть по row's structure)
 
-**Bin movement triggers drift through clip-axis**: если user moves displaced bin containing clips → all contained clips effectively at new position → drift fires on those clips. Empty displaced bin = silent (no drift) until first file imports.
+**Cascade behavior**: когда drift fires (clip-level OR bin-level) — row covering этот item → DRIFT state, **cascade up to root** (все ancestor rows тоже show drift indicator).
 
 NOT drift:
 - File not yet imported (absent в Premiere) — это «pending import», not drift
 - Clip offline + at original FS path — clip's path matches expected bin → no drift
 - File relinked to unwatched location → side-file, not drift
-- Empty displaced bin — silent until file enters
+- Empty displaced bin БЕЗ contents — silent на clip-axis, но **bin-level drift** триггерится (per новая formulation выше)
 
 Drift cleared by: Magnet (moves bin OR clip back to SoT, side-files preserved) OR Merge (auto-dedup migrates).
 
@@ -766,33 +829,29 @@ Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via 
 >
 > Cells derivable from foundational rules 1-27 выше. Если case не выводится — gap, нужно discuss.
 
-### Edge cases для дискуссии (требуют user decision)
+### Edge cases — все resolved 🟢 (2026-05-04)
 
-После прохождения matrix выявлены потенциальные edge cases, не однозначно derivable from rules:
+**E1 — Relink across tracked tree boundary:** 🟢 LOCKED
+- SUB=off **NOT отменяет** path coverage. Display walker recurses, дети получают cascade-disable runtime, но walker видит дерево.
+- Per Rule 19 «path coverage = recursive walker reach» — relink target под SUB=off subtree всё равно covered → MERGE (case 11 в matrix).
+- «Свободный path» = path вне всех tracked root recursive coverages (incl. SUB=off subtrees, которые покрыты но cascade-disabled).
 
-**E1 — Relink across tracked tree boundary:**
-- Source row Healthy child под Root1
-- Target = path under Root2 (other tracked root)
-- Что значит «свободный path»? Если path под Root2's recursive coverage → covered (rule 19) → MERGE? Или просто under Root2 = becomes child of Root2?
-- **Discussion needed:** target classification — «свободный» means «не в any tracked root coverage»; если under another tracked root но row для него ещё не создан — это считается covered (rule 19) → merge, не free move. Это rules-derivable если строго применять #19, но worth confirming.
+**E2 — Relink Drifted row на пустой path:** 🟢 LOCKED
+- Drift cleared automatically через rebase + side-file conversion.
+- Row tracks new empty path → clean Healthy (no drift, no content yet).
+- Старые clips: их FS path теряет coverage row'ом → становятся side-files (Rule 25). Bins с side-files cannot auto-delete → preserved as displaced legitimate bins.
+- Resolved by existing rules.
 
-**E2 — Relink Drifted row на path где no clips (clean folder):**
-- Source row Drifted (clips misplaced в Premiere)
-- Target = path где нет files
-- After relink: row at new empty path → walker finds nothing → row becomes... empty Healthy? Drift status preserved или cleared?
-- **Discussion needed:** drift definition rule 26 requires file existence в FS. If new path empty → no drift trigger → drift cleared by virtue of nothing to drift on. Old clips (где они were) → handled per FS-SoT.
+**E3 — Merge during active autoimport:** 🟢 LOCKED
+- **Source busy** (relinking row imports) → REFUSE-OR-WAIT, all functions locked (Rule 6, case 29 в matrix).
+- **Target busy** (target receives merge mid-import) → **QUEUE the merge**. Plugin's event queue serializes — merge waits import drain. UX: «Merge queued — waiting for import to complete». Preserves user intent without forcing retry.
+- **Both busy** → queue (waits both).
+- Future-proof: if axes properly separated → eventually parallel processing without race. MVP serial.
 
-**E3 — Merge during active autoimport:**
-- Plugin currently importing files for new row (busy state)
-- User triggers merge на другую row
-- Race condition — merge dialog UI vs ongoing import
-- **Discussion needed:** queue merge until import done? Or refuse with «busy»? Per rule 6 (Busy = race-prevention) — likely refuse с toast.
-
-**E4 — Multiple roots renamed simultaneously creating overlap:**
-- Edge of T4.1 — user does multiple FS rename ops в quick succession
-- Multiple roots become Missing simultaneously
-- Plugin receives delayed events
-- **Discussion needed:** processing order, race resolution. Per rule 1.5 events sequential idempotent → just process in arrival order, each independently. Should converge but worth validating.
+**E4 — Multiple roots renamed simultaneously:** 🟢 DROPPED (не edge case)
+- Standard mechanic: each row → Missing (path-missing event sequential idempotent per Rule 1.5).
+- User manually relinks each → standard MERGE (case 15) или MOVE (case 14) per matrix.
+- Existing rules достаточны — никакой specific handling нужен.
 
 ---
 
@@ -805,15 +864,13 @@ Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via 
 
 ## Status summary
 
-🟢 **LOCKED (13 items):** T1.1 / T1.2 / T1.3 / T1.4 / T1.5 / T2.1' / T2.3 / T2.5 / T2.6 / T3.1 / T3.2 / T3.3 / T3.4 / T3.5 / T4.2
+🟢 **LOCKED (all):** T1.1 (v2 three-layer) / T1.2 / T1.3 / T1.4 / T1.5 / T2.1' / T2.3 / T2.5 / T2.6 / T3.1 / T3.2 / T3.3 / T3.4 / T3.5 / T4.1 (resolved via RESTRUCTURE column matrix) / T4.2 / T4.3 (resolved via matrix + E1-E4 locks)
 
 ⚫ **PARKED (5 items):** T2.1 / T2.4 / T3.6 / T3.7 / T3.8
 
-🔴 **OPEN — deep-dive block:**
-- **T4.1** — Root-inside-root (mostly resolves через matrix RESTRUCTURE column)
-- **T4.3** — Merge linking mechanic (matrix покрывает основное, остаются edge cases E1-E4)
+🟢 **Edge cases all resolved (2026-05-04):** E1 / E2 / E3 / E4 all LOCKED или DROPPED.
 
-🟢 **Foundational rules:** 27 explicit rules locked (1-13 existing + 14-27 new in this session). Decision matrix derived from rules.
+🟢 **Foundational rules:** 27 explicit rules (1-13 existing + 14-27 new). Rule 8 + Rule T1.1 refined к three-layer disable model. Rule 24 + 26 refined с drift exception. Decision matrix derived from rules.
 
 📋 **Decision Matrix:** [`relink-merge-matrix.ru.csv`](relink-merge-matrix.ru.csv) — 29 cases (4 Add + 25 Relink, после consolidation «already tracked» в MERGE category). 4 edge cases (E1-E4) for further discussion в WIP doc.
 
@@ -821,7 +878,12 @@ Manifest stores ONLY legitimate bins. Side-bins discovered each walker pass via 
 
 ## Next steps
 
-1. **User reviews matrix** — walk through cases, validate cells, identify gaps. Address E1-E4 edge cases.
-2. **Lock matrix** — when satisfied, all relink/merge decisions are derivable.
-3. **Sync sweep** для всех 🟢 LOCKED items + matrix в spec/parked-notes/mockup (single commit или две части).
-3. **After deep-dive lock** — second sync sweep для T4.1/T4.3
+1. **Sync sweep** для всех 🟢 LOCKED items + matrix в spec/parked-notes/mockup. Major touchpoints:
+   - `state-design.md`: §"5. Disabled causes" (three-layer model), §6 × matrix (toggle UX), §7 → "Relink mechanics" rewrite, §16 (drift refinements + path coverage), §"Events" idempotency note
+   - `parked-notes.md`: relink contract, merge contract, dedup levels, three-layer disable contract
+   - `mirror-decisions.csv` + `.ru.csv`: minor — drift formal definition note
+   - `panel.figma-script.js`: §1 × annotation (toggle behavior), §6 × matrix update, §13 boundary refresh, §REF state taxonomy verify
+
+2. **Verify matrix CSV** в spreadsheet — final visual review, любые final tweaks.
+
+3. **Implementation handoff** — после sync: 27 rules + 29-case matrix + locked taxonomy provide implementation blueprint.
